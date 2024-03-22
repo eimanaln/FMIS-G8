@@ -1,0 +1,70 @@
+theory P1
+begin
+
+builtins: symmetric-encryption
+
+rule Register_key:
+  [Fr(~kab)]
+
+  --[ Register($A, $B) ]->
+
+  [ !SharedKey($A, $B, ~kab) ]
+
+
+rule Reveal_key:
+  [ !SharedKey(A, B, kab) ]
+
+  --[ Reveal(A, B) ]->
+
+  [ Out(kab) ]
+
+
+rule Init_A:
+  [ Fr(~idA), !SharedKey(A, B, kab) ]
+
+  --[ Init_A(A, ~idA) ]->
+
+  [ St_A_1(A, ~idA, kab, B) ]
+
+
+rule Init_B:
+  [ Fr(~idB), !SharedKey(B, A, kba) ]
+
+  --[ Init_B(B, ~idB) ]->
+
+  [ St_B_1(B, ~idB, kba, A) ]
+
+
+rule A_1_send:
+  [ Fr(~x), St_A_1(A, ~idA, kab, B) ]
+
+  --[ Send(A, ~x) ]-> // is ~ needed here or not? Also, where do we instrument Run/Commit?
+
+  [ St_A_2(A, ~idA, kab, B, ~x), Out(~x) ]
+
+
+rule B_1_recv:
+  [ St_B_1(B, ~idB, kba, A), In(x) ]
+
+  --[ Recv(B, x) ]->
+
+  [ St_B_2(B, ~idB, kba, A, x) ]
+
+
+rule B_2_send:
+  [ St_B_2(B, ~idB, kba, A, x) ]
+
+  --[ Send(A, senc(x, kba)) ]->
+
+  [ St_B_3(B, ~idB, kba, A, x, senc(x, kba)), Out(senc(x, kba)) ]
+
+
+rule A_2_recv:
+  [ St_A_2(A, ~idA, kab, B, x), In(c) ] // receive ciphertext
+
+  --[ Recv(A, c) ]->
+
+  [ St_A_3(A, ~idA, kab, B, x, c) ]
+
+
+end
