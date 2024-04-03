@@ -1,129 +1,66 @@
-/*
-Initial Example for the Tamarin Manual
-======================================
-
-Authors: 	Simon Meier, Benedikt Schmidt
-Updated by: 	Jannik Dreier, Ralf Sasse
-Date: 	        June 2016
-
-This file is documented in the Tamarin user manual.
-
-*/
-
-// 1- Decalre the name of the theory and start modeling 
-theory FirstExample
+theory P1
 begin
+ 
+builtins: symmetric-encryption
 
-// 2- declare the crypto primitives 
-builtins: hashing, asymmetric-encryption
+// define mac function 
+functions: mac/2
 
-// 3- Modeling public key Infrastructure 
+// setup phase 
+// Alice and Bob each have their own secret key 
+// TODO: unidirectional action fact should be here
+rule setup_sk:
+[Fr(~k)]--[UnidirectionalKey($A, $B, ~k)]->[!setup_sk($A, $B, ~k)]
 
-// Registering a public key
-// means generate a random value for the private key ltk and like it to the agent A 
-//  pk(~ltk) is the public key of A
-rule Register_pk:
-    [ Fr(~ltk) ]
-  -->
-    [ !Ltk($A, ~ltk), !Pk($A, pk(~ltk)) ]
+// Reveal rules
+// Compromise an agent's key (pg. 59 in Tamarin manual under secrecy rule)
+rule reveal_sk_A:
+[!setup_sk($A, $B, k)]--[Reveal( $A )]->[Out(k)]
 
-// allows any adversary to retreive any public key using this function 
-// it reads a public-key database entry and sends the public key to 
-// the network using the built-in fact Out
-rule Get_pk:
-    [ !Pk(A, pubkey) ]
-  -->
-    [ Out(pubkey) ]
+rule reveal_sk_B:
+[!setup_sk($A, $B, k)]--[Reveal( $B )]->[Out(k)]
 
+// modeling the protocol 
+// TODO: is fresh idenity imporant? 
+// TODO: how to tag? 
+rule Alice_0: 
+[Fr(~id), !setup_sk($A, $B, ~k) ]-->[Alice_0(A, B, k , ~id)]
 
-// model the dynamic compromise of long-term private keys using the following rule. 
-// Intuitively, it reads a private-key database entry and sends it to the adversary
-// rule has an observable LtkReveal action stating that the long-term key of agent A 
-//was compromised.
-rule Reveal_ltk:
-    [ !Ltk(A, ltk) ]
-  --[ LtkReveal(A) ]->
-    [ Out(ltk) ]
+rule Bob_0: 
+[Fr(~id), !setup_sk($A, $B, ~k) ]-->[Bob_0(B, A, k , ~id)]
 
 
-// 4 - modeling the protocol 
+rule Alice_1:
+[Fr(~x), Alice_0(A, B, k , id)]-->[Alice_1(A, B, k , id, ~x), Out(~x)]
 
-// Start a new thread executing the client role, choosing the server
-// non-deterministically.
-rule Client_1:
-    [ Fr(~k)         // choose fresh key
-    , !Pk($S, pkS)   // lookup public-key of server
-    ]
-  -->
-    [ Client_1( $S, ~k )    // Store server and key for next step of thread
-    , Out( aenc(~k, pkS) )  // Send the encrypted session key to the server
-    ]
-
-rule Client_2:
-    [ Client_1(S, k)   // Retrieve server and session key from previous step
-    , In( h(k) )       // Receive hashed session key from network
-    ]
-  --[ SessKeyC( S, k ) ]-> // State that the session key 'k'
-    []                     // was setup with server 'S'
-
-// A server thread answering in one-step to a session-key setup request from
-// some client.
-rule Serv_1:
-    [ !Ltk($S, ~ltkS)                             // lookup the private-key
-    , In( request )                               // receive a request
-    ]
-  --[ AnswerRequest($S, adec(request, ~ltkS)) ]-> // Explanation below
-    [ Out( h(adec(request, ~ltkS)) ) ]            // Return the hash of the
-                                                  // decrypted request.
+rule Bob_1:
+[Bob_0(B, A, k , id), In(x)]--[Running(B,A,<’I’,’R’,x>]->[Bob_1(B, A, k , id, x)]
 
 
-lemma Client_session_key_secrecy:
-  " /* It cannot be that a  */
-    not(
-      Ex S k #i #j.
-        /* client has set up a session key 'k' with a server'S' */
-        SessKeyC(S, k) @ #i
-        /* and the adversary knows 'k' */
-      & K(k) @ #j
-        /* without having performed a long-term key reveal on 'S'. */
-      & not(Ex #r. LtkReveal(S) @ r)
-    )
-  "
+rule Bob_2:
+[Bob_1(B, A, k , id, x)]-->[Bob_2(B, A, k , id, x), Out(mac(x,k))]
 
-lemma Client_auth:
-  " /* For all session keys 'k' setup by clients with a server 'S' */
-    ( All S k #i.  SessKeyC(S, k) @ #i
-       ==>
-         /* there is a server that answered the request */
-       ( (Ex #a. AnswerRequest(S, k) @ a)
-         /* or the adversary performed a long-term key reveal on 'S'
-            before the key was setup. */
-       | (Ex #r. LtkReveal(S) @ r & r < i)
-       )
-    )
-  "
 
-lemma Client_auth_injective:
-  " /* For all session keys 'k' setup by clients with a server 'S' */
-    ( All S k #i.  SessKeyC(S, k) @ #i
-       ==>
-         /* there is a server that answered the request */
-       ( (Ex #a. AnswerRequest(S, k) @ a
-           /* and there is no other client that had the same request */
-           & (All #j. SessKeyC(S, k) @ #j ==> #i = #j)
-       )
-         /* or the adversary performed a long-term key reveal on 'S'
-            before the key was setup. */
-       | (Ex #r. LtkReveal(S) @ r & r < i)
-       )
-    )
-  "
+rule Alice_2:
+[Alice_1(A, B, k , id, x), In(mac(x,k))]--[Commit(A, B, <'I', 'R', x> )]->[Alice_2(A, B, k , id, x)]
 
-lemma Client_session_key_honest_setup:
-  exists-trace
-  " Ex S k #i.
-        SessKeyC(S, k) @ #i
-      & not(Ex #r. LtkReveal(S) @ r)
-  "
+
+// unidirectional key 
+// TODO: verify this is correct 
+restriction UnidirectionalKey:
+"All a b k #i. UnidirectionalKey(a, b, k) @i & UnidirectionalKey(b, a, k) @i & (a!=b) ==> False   
+"
+
+// executability lemma? 
+
+
+// authentication property that A injectively agrees with B on the nonce x
+lemma injectiveagreementINITIATOR:
+  "All a b t #i.
+    Commit(a,b,<’I’,’R’,t>)@i &
+    not ((Ex #r. Reveal(a)@r) | (Ex #r. Reveal(b)@r))
+    ==> (Ex #j. Running(b,a,<’I’,’R’,t>)@j
+        & not (Ex a2 b2 #i2. Commit(a2,b2,<’I’,’R’,t>)@i2
+                           & not (#i2 = #i)))"
 
 end
