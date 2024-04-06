@@ -9,7 +9,7 @@ equations:
 rule Register_key:
   [ Fr(~k) ]
 
-  --[ Register($A, $B) ]->
+  --[ Register($A, $B, ~k) ]->
 
   [ !SharedKey($A, $B, ~k) ]
 
@@ -69,25 +69,28 @@ rule A_2_recv:
 
   [ St_A_3(A, ~idA, kba, B, x, mac(x,kba)) ]
 
+restriction UnidirectionalKey:
+  " All a b k1 k2 #i #j.
+      Register(a, b, k1)@i & Register(b, a, k2)@j ==> not (k1 = k2)"
 
 lemma executable: exists-trace
-  "Ex #i.
-    Finish() @i &
-    not (Ex I1 I2 id1 id2 #j #k. Init_A(I1, id1)@j & Init_A(I2, id2)@k & not (#j = #k)) &
-    not (Ex A B #j. Reveal(A, B)@j)"
+  " Ex #i.
+      Finish() @i &
+      not (Ex I1 I2 id1 id2 #j #k. Init_A(I1, id1)@j & Init_A(I2, id2)@k & not (#j = #k)) &
+      not (Ex A B #j. Reveal(A, B)@j)"
 
 lemma noninjectiveagreementINITIATOR:
-  "All A B t #i.
-    Commit(A,B,<'I','R',t>)@i &
-    not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
-      ==> (Ex #j. Running(B,A,<'I','R',t>)@j)"
+  " All A B t #i.
+      Commit(A,B,<'I','R',t>)@i &
+      not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+        ==> (Ex #j. Running(B,A,<'I','R',t>)@j)"
 
 lemma injectiveagreementINITIATOR:
-  "All A B t #i.
-    Commit(A,B,<'I','R',t>)@i &
-    not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
-    ==> (Ex #j. Running(B,A,<'I','R',t>)@j
-      & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>)@i2
-        & not (#i2 = #i)))"
+  " All A B t #i.
+      Commit(A,B,<'I','R',t>)@i &
+      not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+      ==> (Ex #j. Running(B,A,<'I','R',t>)@j
+        & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>)@i2
+          & not (#i2 = #i)))"
 
 end
