@@ -1,10 +1,13 @@
 theory P1
 begin
 
-builtins: symmetric-encryption
+functions:
+  mac/2, verify/3, true/0
+equations:
+  verify(k, m, mac(m, k)) = true
 
 rule Register_key:
-  [Fr(~kab)]
+  [ Fr(~kab) ]
 
   --[ Register($A, $B) ]->
 
@@ -54,17 +57,23 @@ rule B_1_recv:
 rule B_2_send:
   [ St_B_2(B, ~idB, kba, A, x) ]
 
-  --[ Send(A, senc(x, kba)) ]->
+  --[ Send(A, mac(x, kba)) ]->
 
-  [ St_B_3(B, ~idB, kba, A, x, senc(x, kba)), Out(senc(x, kba)) ]
+  [ St_B_3(B, ~idB, kba, A, x, mac(x, kba)), Out(mac(x, kba)) ]
 
 
 rule A_2_recv:
   [ St_A_2(A, ~idA, kab, B, x), In(c) ] // receive ciphertext
 
-  --[ Recv(A, c) ]->
+  --[ Recv(A, c), Finish() ]->
 
   [ St_A_3(A, ~idA, kab, B, x, c) ]
 
+
+lemma executable: exists-trace
+  "Ex #i.
+    Finish() @i &
+    not (Ex I1 I2 id1 id2 #j #k. Init_A(I1, id1)@j & Init_A(I2, id2)@k & not (#j = #k)) &
+    not (Ex A B #j. Reveal(A, B)@j)"
 
 end
