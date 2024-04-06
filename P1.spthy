@@ -7,27 +7,27 @@ equations:
   verify(k, m, mac(m, k)) = true
 
 rule Register_key:
-  [ Fr(~kab) ]
+  [ Fr(~k) ]
 
   --[ Register($A, $B) ]->
 
-  [ !SharedKey($A, $B, ~kab) ]
+  [ !SharedKey($A, $B, ~k) ]
 
 
 rule Reveal_key:
-  [ !SharedKey(A, B, kab) ]
+  [ !SharedKey(A, B, k) ]
 
   --[ Reveal(A, B) ]->
 
-  [ Out(kab) ]
+  [ Out(k) ]
 
 
 rule Init_A:
-  [ Fr(~idA), !SharedKey(A, B, kab) ]
+  [ Fr(~idA), !SharedKey(B, A, kba) ]
 
   --[ Init_A(A, ~idA) ]->
 
-  [ St_A_1(A, ~idA, kab, B) ]
+  [ St_A_1(A, ~idA, kba, B) ]
 
 
 rule Init_B:
@@ -39,11 +39,11 @@ rule Init_B:
 
 
 rule A_1_send:
-  [ Fr(~x), St_A_1(A, ~idA, kab, B) ]
+  [ Fr(~x), St_A_1(A, ~idA, kba, B) ]
 
-  --[ Send(A, ~x) ]-> // is ~ needed here or not? Also, where do we instrument Run/Commit?
+  --[ Send(A, ~x), Running(A, B, ~x) ]->
 
-  [ St_A_2(A, ~idA, kab, B, ~x), Out(~x) ]
+  [ St_A_2(A, ~idA, kba, B, ~x), Out(~x) ]
 
 
 rule B_1_recv:
@@ -57,17 +57,17 @@ rule B_1_recv:
 rule B_2_send:
   [ St_B_2(B, ~idB, kba, A, x) ]
 
-  --[ Send(A, mac(x, kba)) ]->
+  --[ Send(A, mac(x, kba)), Running(B, A, <'I','R',x>) ]->
 
   [ St_B_3(B, ~idB, kba, A, x, mac(x, kba)), Out(mac(x, kba)) ]
 
 
 rule A_2_recv:
-  [ St_A_2(A, ~idA, kab, B, x), In(c) ] // receive ciphertext
+  [ St_A_2(A, ~idA, kba, B, x), In(mac(x,kba)) ]
 
-  --[ Recv(A, c), Finish() ]->
+  --[ Recv(A, mac(x,kba)), Commit(A, B, <'I','R',x>), Finish() ]->
 
-  [ St_A_3(A, ~idA, kab, B, x, c) ]
+  [ St_A_3(A, ~idA, kba, B, x, mac(x,kba)) ]
 
 
 lemma executable: exists-trace
@@ -75,5 +75,19 @@ lemma executable: exists-trace
     Finish() @i &
     not (Ex I1 I2 id1 id2 #j #k. Init_A(I1, id1)@j & Init_A(I2, id2)@k & not (#j = #k)) &
     not (Ex A B #j. Reveal(A, B)@j)"
+
+lemma noninjectiveagreementINITIATOR:
+  "All A B t #i.
+    Commit(A,B,<'I','R',t>)@i &
+    not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+      ==> (Ex #j. Running(B,A,<'I','R',t>)@j)"
+
+lemma injectiveagreementINITIATOR:
+  "All A B t #i.
+    Commit(A,B,<'I','R',t>)@i &
+    not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+    ==> (Ex #j. Running(B,A,<'I','R',t>)@j
+      & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>)@i2
+        & not (#i2 = #i)))"
 
 end

@@ -1,6 +1,6 @@
 theory lemmas
 begin
-
+/*
 lemma secrecy:
     "All A B x #i.
         Secret(A,B,x)@i &
@@ -41,5 +41,6 @@ lemma injectiveagreementRESPONDER:
         ==> (Ex #j. Running(b,a,<'R','I',t>)@j
             & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>)@i2
             & not (#i2 = #i)))"
+*/
 
 end
