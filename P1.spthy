@@ -69,9 +69,9 @@ rule A_2_recv:
 
   [ St_A_3(A, ~idA, kba, B, x, mac(x,kba)) ]
 
-restriction UnidirectionalKey:
+lemma UnidirectionalKey:
   " All a b k1 k2 #i #j.
-      Register(a, b, k1)@i & Register(b, a, k2)@j ==> not (k1 = k2)"
+      not (a = b) & Register(a, b, k1)@i & Register(b, a, k2)@j ==> not (k1 = k2)"
 
 lemma executable: exists-trace
   " Ex #i.
