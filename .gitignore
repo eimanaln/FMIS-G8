@@ -9,3 +9,7 @@ tmp/
 
 # tamarin
 *.aes
+
+# flake
+flake.nix
+flake.lock
