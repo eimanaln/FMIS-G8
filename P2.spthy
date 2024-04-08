@@ -55,17 +55,21 @@ rule B_1_recv:
 
 
 rule B_2_send:
+  let stB = <x,kab,kba,A,idB>
+  in
   [ Fr(~y), St_B_2(B, stB) ]
 
-  --[ Send(B, ~y) ]->
+  --[ Send(B, ~y), Running(B,A,<x,~y>) ]->
 
   [ St_B_3(B, <~y,stB>), Out(~y) ]
 
 
 rule A_2_recv:
+  let stA = <x,kab,kba,B,idA>
+  in
   [ St_A_2(A, stA), In(y) ]
 
-  --[ Recv(A, y) ]->
+  --[ Recv(A, y), Running(A,B,<x,y>) ]->
 
   [ St_A_3(A, <y,stA>) ]
 
@@ -91,21 +95,21 @@ rule A_3_recv:
 
 
 rule A_4_send:
-  let stA = <macx,y,x,kab,rest>
+  let stA = <macx,y,x,kab,kba,B,idA>
   in
   [ St_A_4(A, stA) ]
 
-  --[ Send(A, mac(y,kab)) ]->
+  --[ Send(A, mac(y,kab)), Commit(B,A,<x,y>) ]->
 
   [ St_A_5(A, <mac(y,kab),stA>), Out(mac(y,kab)) ]
 
 
 rule B_4_recv:
-  let stB = <macx,y,x,kab,rest>
+  let stB = <macx,y,x,kab,A,idB>
   in
   [ St_B_4(B, stB), In(mac(y,kab)) ]
 
-  --[ Recv(B, mac(y,kab)), Finish() ]->
+  --[ Recv(B, mac(y,kab)), Finish(), Commit(A,B,<x,y>) ]->
 
   [ St_B_5(B, <mac(y,kab),stB>) ]
 
@@ -129,16 +133,16 @@ lemma executable: exists-trace
 
 lemma noninjectiveagreementINITIATOR:
   " All A B t #i.
-      Commit(A,B,<'I','R',t>)@i &
+      Commit(A,B,t)@i &
       not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
-        ==> (Ex #j. Running(B,A,<'I','R',t>)@j)"
+        ==> (Ex #j. Running(B,A,t)@j)"
 
 lemma injectiveagreementINITIATOR:
   " All A B t #i.
-      Commit(A,B,<'I','R',t>)@i &
+      Commit(A,B,t)@i &
       not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
-      ==> (Ex #j. Running(B,A,<'I','R',t>)@j
-        & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>)@i2
+      ==> (Ex #j. Running(B,A,t)@j
+        & not (Ex a2 b2 #i2. Commit(a2,b2,t)@i2
           & not (#i2 = #i)))"
 
 // restrict to get simpler attacks
