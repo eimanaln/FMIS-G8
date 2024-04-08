@@ -27,7 +27,7 @@ rule Init_A:
 
   --[ Init_A(A, ~idA) ]->
 
-  [ St_A_1(A, ~idA, kab, B, kba) ]
+  [ St_A_1(A, <kab,kba,B,~idA>) ]
 
 
 rule Init_B:
@@ -35,71 +35,79 @@ rule Init_B:
 
   --[ Init_B(B, ~idB) ]->
 
-  [ St_B_1(B, ~idB, kba, A, kab) ]
+  [ St_B_1(B, <kab,kba,A,~idB>) ]
 
 
 rule A_1_send:
-  [ Fr(~x), St_A_1(A, ~idA, kab, B, kba) ]
+  [ Fr(~x), St_A_1(A, stA) ]
 
   --[ Send(A, ~x) ]->
 
-  [ St_A_2(A, ~idA, kab, B, kba, ~x), Out(~x) ]
+  [ St_A_2(A, <~x,stA>), Out(~x) ]
 
 
 rule B_1_recv:
-  [ St_B_1(B, ~idB, kba, A, kab), In(x) ]
+  [ St_B_1(B, stB), In(x) ]
 
   --[ Recv(B, x) ]->
 
-  [ St_B_2(B, ~idB, kba, A, kab, x) ]
+  [ St_B_2(B, <x,stB>) ]
 
 
 rule B_2_send:
-  [ Fr(~y), St_B_2(B, ~idB, kba, A, kab, x) ]
+  [ Fr(~y), St_B_2(B, stB) ]
 
   --[ Send(B, ~y) ]->
 
-  [ St_B_3(B, ~idB, kba, A, kab, x, ~y), Out(~y) ]
+  [ St_B_3(B, <~y,stB>), Out(~y) ]
 
 
 rule A_2_recv:
-  [ St_A_2(A, ~idA, kab, B, kba, x), In(y) ]
+  [ St_A_2(A, stA), In(y) ]
 
   --[ Recv(A, y) ]->
 
-  [ St_A_3(A, ~idA, kab, B, kba, x, y) ]
+  [ St_A_3(A, <y,stA>) ]
 
 
 rule B_3_send:
-  [ St_B_3(B, ~idB, kba, A, kab, x, y) ]
+  let stB = <y,x,kab,kba,rest>
+  in
+  [ St_B_3(B, stB) ]
 
-  --[ Send(B, mac(x, kba)) ]->
+  --[ Send(B, mac(x,kba)) ]->
 
-  [ St_B_4(B, ~idB, kba, A, kab, x, y, mac(x, kba)), Out(mac(x, kba)) ]
+  [ St_B_4(B, <mac(x,kba),stB>), Out(mac(x,kba)) ]
 
 
 rule A_3_recv:
-  [ St_A_3(A, ~idA, kab, B, kba, x, y), In(mac(x,kba)) ]
+  let stA = <y,x,kab,kba,rest>
+  in
+  [ St_A_3(A, stA), In(mac(x,kba)) ]
 
   --[ Recv(A, mac(x,kba)) ]->
 
-  [ St_A_4(A, ~idA, kab, B, kba, x, y, mac(x,kba)) ]
+  [ St_A_4(A, <mac(x,kba),stA>) ]
 
 
 rule A_4_send:
-  [ St_A_4(A, ~idA, kab, B, kba, x, y, mac(x,kba)) ]
+  let stA = <macx,y,x,kab,rest>
+  in
+  [ St_A_4(A, stA) ]
 
-  --[ Send(A, mac(y, kab)) ]->
+  --[ Send(A, mac(y,kab)) ]->
 
-  [ St_A_5(A, ~idA, kab, A, kba, x, y, mac(x, kba), mac(y,kab)), Out(mac(y, kab)) ]
+  [ St_A_5(A, <mac(y,kab),stA>), Out(mac(y,kab)) ]
 
 
 rule B_4_recv:
-  [ St_B_4(B, ~idB, kba, A, kab, x, y, mac(x,kba)), In(mac(y,kab)) ]
+  let stB = <macx,y,x,kab,rest>
+  in
+  [ St_B_4(B, stB), In(mac(y,kab)) ]
 
-  --[ Recv(B, mac(x,kba)), Commit(A, B, <'I','R',x>), Finish() ]->
+  --[ Recv(B, mac(y,kab)), Finish() ]->
 
-  [ St_B_5(B, ~idB, kba, A, kab, x, y, mac(x,kba), mac(y,kab)) ]
+  [ St_B_5(B, <mac(y,kab),stB>) ]
 
 
 lemma UnidirectionalKey:
