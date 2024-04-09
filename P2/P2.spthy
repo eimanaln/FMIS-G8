@@ -1,6 +1,8 @@
 theory P2
 begin
 
+builtins: multiset
+
 functions:
   mac/2, verify/3, true/0
 equations:
@@ -23,11 +25,11 @@ rule Reveal_key:
 
 
 rule Init_A:
-  [ Fr(~idA), !SharedKey(A, B, kab) , !SharedKey(B, A, kba)]
+  [ Fr(~idA), !SharedKey(A, B, kab) , !SharedKey(B, A, kba) ]
 
   --[ Init_A(A, ~idA) ]->
 
-  [ St_A_1(A, <kab,kba,B,~idA>) ]
+  [ St_A_1(A, <'kab',kab>+<'kba',kba>+<'B',B>+<'idA',~idA>) ]
 
 
 rule Init_B:
@@ -35,7 +37,7 @@ rule Init_B:
 
   --[ Init_B(B, ~idB) ]->
 
-  [ St_B_1(B, <kab,kba,A,~idB>) ]
+  [ St_B_1(B, <'kab',kab>+<'kba',kba>+<'A',A>+<'idB',~idB>) ]
 
 
 rule A_1_send:
@@ -43,7 +45,7 @@ rule A_1_send:
 
   --[ Send(A, ~x) ]->
 
-  [ St_A_2(A, <~x,stA>), Out(~x) ]
+  [ St_A_2(A, <'x',~x>+stA), Out(~x) ]
 
 
 rule B_1_recv:
@@ -51,67 +53,67 @@ rule B_1_recv:
 
   --[ Recv(B, x) ]->
 
-  [ St_B_2(B, <x,stB>) ]
+  [ St_B_2(B, <'x',x>+stB) ]
 
 
 rule B_2_send:
-  let stB = <x,kab,kba,A,idB>
+  let stB = <'x',x>+<'A',A>+rest
   in
   [ Fr(~y), St_B_2(B, stB) ]
 
   --[ Send(B, ~y), Running(B,A,<'I','R',x,~y>) ]->
 
-  [ St_B_3(B, <~y,stB>), Out(~y) ]
+  [ St_B_3(B, <'y',~y>+stB), Out(~y) ]
 
 
 rule A_2_recv:
-  let stA = <x,kab,kba,B,idA>
+  let stA = <'x',x>+<'B',B>+rest // <x,kab,kba,B,idA>
   in
   [ St_A_2(A, stA), In(y) ]
 
   --[ Recv(A, y), Running(A,B,<'R','I',x,y>) ]->
 
-  [ St_A_3(A, <y,stA>) ]
+  [ St_A_3(A, <'y',y>+stA) ]
 
 
 rule B_3_send:
-  let stB = <y,x,kab,kba,rest>
+  let stB = <'kba',kba>+<'x',x>+rest
   in
   [ St_B_3(B, stB) ]
 
   --[ Send(B, mac(x,kba)) ]->
 
-  [ St_B_4(B, <mac(x,kba),stB>), Out(mac(x,kba)) ]
+  [ St_B_4(B, <'macx',mac(x,kba)>+stB), Out(mac(x,kba)) ]
 
 
 rule A_3_recv:
-  let stA = <y,x,kab,kba,rest>
+  let stA = <'kba',kba>+<'x',x>+rest
   in
   [ St_A_3(A, stA), In(mac(x,kba)) ]
 
   --[ Recv(A, mac(x,kba)) ]->
 
-  [ St_A_4(A, <mac(x,kba),stA>) ]
+  [ St_A_4(A, <'macx',mac(x,kba)>+stA) ]
 
 
 rule A_4_send:
-  let stA = <macx,y,x,kab,kba,B,idA>
+  let stA = <'kab',kab>+<'x',x>+<'y',y>+<'B',B>+rest
   in
   [ St_A_4(A, stA) ]
 
   --[ Send(A, mac(y,kab)), Commit(A,B,<'I','R',x,y>) ]->
 
-  [ St_A_5(A, <mac(y,kab),stA>), Out(mac(y,kab)) ]
+  [ St_A_5(A, <'macy',mac(y,kab)>+stA), Out(mac(y,kab)) ]
 
 
 rule B_4_recv:
-  let stB = <macx,y,x,kab,kba,A,idB>
+  let stB = <'kab',kab>+<'x',x>+<'y',y>+<'A',A>+rest
   in
   [ St_B_4(B, stB), In(mac(y,kab)) ]
 
   --[ Recv(B, mac(y,kab)), Finish(), Commit(B,A,<'R','I',x,y>) ]->
 
-  [ St_B_5(B, <mac(y,kab),stB>) ]
+  [ St_B_5(B, <'macy',mac(y,kab)>+stB) ]
 
 
 lemma UnidirectionalKey:
