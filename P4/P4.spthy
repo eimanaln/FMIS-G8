@@ -47,11 +47,12 @@ rule A_1_send:
 
   --[ Send(A, ~x) ]->
 
-  [ St_A_2(A, <'s',s>+<'x',~x>+stA), Out(<~x,senc(~s, h(k))>) ]
+  [ St_A_2(A, <'s',~s>+<'x',~x>+stA), Out(<~x,senc(~s, h(k))>) ]
 
 
 rule B_1_recv:
   let stB = <'k',k>+rest
+  in
   [ St_B_1(B, stB), In(<x, senc(s, h(k))>) ]
 
   --[ Recv(B, x) ]->
@@ -116,8 +117,8 @@ rule A_4_send:
 
 
 rule B_4_recv:
-  let stB = <'k',k>+<'x',x>+<'y',y>+<'A',A>+rest
-      dk = kdf(k,x,y)
+  let stB = <'s',s>+<'x',x>+<'y',y>+<'A',A>+rest
+      dk = kdf(s,x,y)
       macy = mac(y,dk)
   in
   [ St_B_4(B, stB), In(macy) ]
