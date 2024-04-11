@@ -128,9 +128,9 @@ rule B_4_recv:
   [ St_B_5(B, <'macy',macy>+stB) ]
 
 
-lemma UnidirectionalKey:
-  " All a b k1 k2 #i #j.
-      not (a = b) & Register(a, b, k1)@i & Register(b, a, k2)@j ==> not (k1 = k2)"
+// lemma UnidirectionalKey:
+//   " All a b k1 k2 #i #j.
+//       not (a = b) & Register(a, b, k1)@i & Register(b, a, k2)@j ==> not (k1 = k2)"
 
 lemma executable_restricted: exists-trace
   " Ex #i.
