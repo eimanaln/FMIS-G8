@@ -1,0 +1,192 @@
+theory P5ab
+begin
+
+builtins: multiset, hashing, symmetric-encryption, diffie-hellman
+
+functions:
+  mac/2, verify/3, true/0, map/2
+equations:
+  verify(k, m, mac(m, k)) = true
+
+rule Register_key:
+  [ Fr(~k) ]
+
+  --[ Register($A, $B, ~k) ]->
+
+  [ !SharedKey($A, $B, ~k) ]
+
+
+rule Reveal_key:
+  [ !SharedKey(A, B, k) ]
+
+  --[ Reveal(A,B) ]->
+
+  [ Out(k) ]
+
+
+rule Init_A:
+  [ Fr(~idA), !SharedKey(A, B, k) ]
+
+  --[ Init_A(A, ~idA) ]->
+
+  [ St_A_1(A, <'k',k>+<'B',B>+<'idA',~idA>) ]
+
+
+rule Init_B:
+  [ Fr(~idB), !SharedKey(A, B, k) ]
+
+  --[ Init_B(B, ~idB) ]->
+
+  [ St_B_1(B, <'k',k>+<'A',A>+<'idB',~idB>) ]
+
+
+rule A_1_send:
+  let stA = <'k',k>+rest
+      g = map(~s, $p)
+  in
+  [ Fr(~x), Fr(~s), St_A_1(A, stA) ]
+
+  --[ Send(A, <$p, g^~x, senc(~s,h(k))>) ]->
+
+  [ St_A_2(A, <'s',~s>+<'x',~x>+stA), Out(<$p, g^~x, senc(~s, h(k))>) ]
+
+
+rule B_1_recv:
+  let stB = <'k',k>+rest
+  in
+  [ St_B_1(B, stB), In(<p, gx, senc(s,h(k))>) ]
+
+  --[ Recv(B, <p,gx,senc(s,h(k))>) ]->
+
+  [ St_B_2(B, <'p',p>+<'s',s>+<'gx',gx>+stB) ]
+
+
+rule B_2_send:
+  let stB = <'p',p>+<'s',s>+<'gx',gx>+<'A',A>+rest
+      g = map(s,p)
+  in
+  [ Fr(~y), St_B_2(B, stB) ]
+
+  --[ Send(B, ~y), Running(B,A,<'I','R',gx,g^~y>) ]->
+
+  [ St_B_3(B, <'y',~y>+stB), Out(g^~y) ]
+
+
+rule A_2_recv:
+  let stA = <'p',p>+<'s',s>+<'x',x>+<'B',B>+rest
+      g = map(s,p)
+  in
+  [ St_A_2(A, stA), In(gy) ]
+
+  --[ Recv(A, gy), Running(A,B,<'R','I',g^x,gy>) ]->
+
+  [ St_A_3(A, <'gy',gy>+stA) ]
+
+
+rule B_3_send:
+  let stB = <'gx',gx>+<'y',y>+rest
+      macx = mac(gx,h(gx^y))
+  in
+  [ St_B_3(B, stB) ]
+
+  --[ Send(B, macx) ]->
+
+  [ St_B_4(B, <'macx',macx>+stB), Out(macx) ]
+
+
+rule A_3_recv:
+  let stA = <'x',x>+<'gy',gy>+rest
+      dk = h(gy^x)
+      macx = mac(x,dk)
+  in
+  [ St_A_3(A, stA), In(macx) ]
+
+  --[ Recv(A, macx) ]->
+
+  [ St_A_4(A, <'macx',macx>+stA) ]
+
+
+rule A_4_send:
+  let stA = <'s',s>+<'p',p>+<'x',x>+<'gy',gy>+<'B',B>+rest
+      dk = h(gy^x)
+      macy = mac(gy,dk)
+      g = map(s,p)
+  in
+  [ St_A_4(A, stA) ]
+
+  --[ Send(A, macy), Commit(A,B,<'I','R',g^x,gy>), Secret(A,B,dk) ]->
+
+  [ St_A_5(A, <'macy',macy>+stA), Out(macy) ]
+
+
+rule B_4_recv:
+  let stB = <'p',p>+<'s',s>+<'gx',gx>+<'y',y>+<'A',A>+rest
+      dk = h(gx^y)
+      macy = mac(y,dk)
+      g = map(s,p)
+  in
+  [ St_B_4(B, stB), In(macy) ]
+
+  --[ Recv(B, macy), Finish(), Commit(B,A,<'R','I',gx,g^y>), Secret(B,A,dk) ]->
+
+  [ St_B_5(B, <'macy',macy>+stB) ]
+
+
+// lemma executable_restricted: exists-trace
+//   " Ex #i.
+//       Finish() @i &
+//       not (Ex I1 I2 id1 id2 #j #k. Init_A(I1, id1)@j & Init_A(I2, id2)@k & not (#j = #k)) &
+//       not (Ex I1 I2 id1 id2 #j #k. Init_B(I1, id1)@j & Init_B(I2, id2)@k & not (#j = #k)) &
+//       not (Ex A B #j. Reveal(A, B)@j)"
+
+lemma executable: exists-trace
+  " Ex #i.
+      Finish() @i &
+      not (Ex I1 I2 id1 id2 #j #k. Init_A(I1, id1)@j & Init_A(I2, id2)@k & not (#j = #k)) &
+      not (Ex A B #j. Reveal(A, B)@j)"
+
+// lemma noninjectiveagreementINITIATOR:
+//   " All A B t #i.
+//       Commit(A,B,<'I','R',t>)@i &
+//         not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+//       ==> (Ex #j. Running(B,A,<'I','R',t>)@j)"
+
+lemma injectiveagreementINITIATOR:
+  " All A B t #i.
+      Commit(A,B,<'I','R',t>)@i &
+        not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+      ==> (Ex #j. Running(B,A,<'I','R',t>)@j
+        & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>)@i2
+          & not (#i2 = #i)))"
+
+// lemma noninjectiveagreementRESPONDER:
+//   " All A B t #i.
+//       Commit(A,B,<'R','I',t>)@i &
+//         not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+//       ==> (Ex #j. Running(B,A,<'R','I',t>)@j)"
+
+lemma injectiveagreementRESPONDER:
+  " All A B t #i.
+      Commit(A,B,<'R','I',t>)@i &
+        not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+      ==> (Ex #j. Running(B,A,<'R','I',t>)@j
+        & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>)@i2
+          & not (#i2 = #i)))"
+
+lemma secrecy:
+  " All A B x #i.
+      Secret(A,B,x)@i &
+        not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+      ==> not (Ex #j. K(x)@j)"
+
+// restrict to get simpler attacks
+restriction one_A_at_most:
+  " not (Ex Name1 Id1 Name2 Id2 #i #j. Init_A(Name1, Id1) @i & Init_A(Name2, Id2) @j & not (#i = #j)) "
+
+restriction one_B_at_most:
+  " not (Ex Name1 Id1 Name2 Id2 #i #j. Init_B(Name1, Id1) @i & Init_B(Name2, Id2) @j & not (#i = #j)) "
+
+restriction one_k_at_most:
+  " not (Ex Name1 Name2 k1 k2 #i #j. Register(Name1, Name2, k1) @i & Register(Name1, Name2, k2) @j & not (#i = #j)) "
+
+end
