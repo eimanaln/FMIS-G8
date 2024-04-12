@@ -163,10 +163,10 @@ lemma injectiveagreementRESPONDER:
 restriction one_A_at_most:
   " not (Ex Name1 Id1 Name2 Id2 #i #j. Init_A(Name1, Id1) @i & Init_A(Name2, Id2) @j & not (#i = #j)) "
 
-restriction one_B_at_most:
-  " not (Ex Name1 Id1 Name2 Id2 #i #j. Init_B(Name1, Id1) @i & Init_B(Name2, Id2) @j & not (#i = #j)) "
+// restriction one_B_at_most:
+//   " not (Ex Name1 Id1 Name2 Id2 #i #j. Init_B(Name1, Id1) @i & Init_B(Name2, Id2) @j & not (#i = #j)) "
 
-restriction one_kab_at_most:
-  " not (Ex Name1 Name2 k1 k2 #i #j. Register(Name1, Name2, k1) @i & Register(Name1, Name2, k2) @j & not (#i = #j)) "
+// restriction one_kab_at_most:
+//   " not (Ex Name1 Name2 k1 k2 #i #j. Register(Name1, Name2, k1) @i & Register(Name1, Name2, k2) @j & not (#i = #j)) "
 
 end
