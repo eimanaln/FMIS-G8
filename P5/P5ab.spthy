@@ -19,7 +19,7 @@ rule Register_key:
 rule Reveal_key:
   [ !SharedKey(A, B, k) ]
 
-  --[ Reveal(A,B) ]->
+  --[ Reveal(A), Reveal(B) ]->
 
   [ Out(k) ]
 
@@ -87,7 +87,7 @@ rule B_3_send:
   in
   [ St_B_3(A, B, idB, k, s, p, gx, y) ]
 
-  --[ Send(B, macx), TB() ]->
+  --[ Send(B, macx) ]->
 
   [ St_B_4(A, B, idB, k, s, p, gx, y, macx), Out(macx) ]
 
@@ -99,7 +99,7 @@ rule A_3_recv:
   in
   [ St_A_3(A, B, idA, k, s, p, x, gy), In(macx) ]
 
-  --[ Recv(A, macx), TA() ]->
+  --[ Recv(A, macx) ]->
 
   [ St_A_4(A, B, idA, k, s, p, x, gy, macx) ]
 
@@ -135,18 +135,18 @@ lemma executable: exists-trace
       Finish() @i &
       // not (Ex I1 I2 id1 id2 #j #k. Init_A(I1, id1)@j & Init_A(I2, id2)@k & not (#j = #k)) &
       // not (Ex I1 I2 id1 id2 #j #k. Init_B(I1, id1)@j & Init_B(I2, id2)@k & not (#j = #k)) &
-      not (Ex A B #j. Reveal(A, B)@j)"
+      not (Ex A #j. Reveal(A)@j)"
 
 lemma noninjectiveagreementINITIATOR:
   " All A B t #i.
       Commit(A,B,<'I','R',t>)@i &
-        not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
       ==> (Ex #j. Running(B,A,<'I','R',t>)@j)"
 
 lemma injectiveagreementINITIATOR:
   " All A B t #i.
       Commit(A,B,<'I','R',t>)@i &
-        not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
       ==> (Ex #j. Running(B,A,<'I','R',t>)@j
         & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>)@i2
           & not (#i2 = #i)))"
@@ -154,13 +154,13 @@ lemma injectiveagreementINITIATOR:
 lemma noninjectiveagreementRESPONDER:
   " All A B t #i.
       Commit(A,B,<'R','I',t>)@i &
-        not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
       ==> (Ex #j. Running(B,A,<'R','I',t>)@j)"
 
 lemma injectiveagreementRESPONDER:
   " All A B t #i.
       Commit(A,B,<'R','I',t>)@i &
-        not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
       ==> (Ex #j. Running(B,A,<'R','I',t>)@j
         & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>)@i2
           & not (#i2 = #i)))"
@@ -168,7 +168,13 @@ lemma injectiveagreementRESPONDER:
 lemma secrecy:
   " All A B x #i.
       Secret(A,B,x)@i &
-        not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
+      ==> not (Ex #j. K(x)@j)"
+
+lemma secrecy_PFS:
+  "  All A B x #i.
+      Secret(A,B,x)@i &
+        not ((Ex #r. Reveal(A)@r & r < i) | (Ex #r. Reveal(B)@r & r < i))
       ==> not (Ex #j. K(x)@j)"
 
 // restrict to get simpler attacks
@@ -178,7 +184,7 @@ restriction one_A_at_most:
 restriction one_B_at_most:
   " not (Ex Name1 Id1 Name2 Id2 #i #j. Init_B(Name1, Id1) @i & Init_B(Name2, Id2) @j & not (#i = #j)) "
 
-restriction one_k_at_most:
-  " not (Ex Name1 Name2 k1 k2 #i #j. Register(Name1, Name2, k1) @i & Register(Name1, Name2, k2) @j & not (#i = #j)) "
+// restriction one_k_at_most:
+//   " not (Ex Name1 Name2 k1 k2 #i #j. Register(Name1, Name2, k1) @i & Register(Name1, Name2, k2) @j & not (#i = #j)) "
 
 end
