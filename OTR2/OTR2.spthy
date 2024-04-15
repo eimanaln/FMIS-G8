@@ -1,0 +1,116 @@
+theory OTR2
+begin
+
+builtins: signing, diffie-hellman
+
+rule Register_key:
+  [ Fr(~k) ] --[ Register($A, ~k) ]-> [ !Ltk($A, ~k), !Pk($A, pk(~k)), Out(pk(~k)) ]
+
+rule Reveal_key:
+  [ !Ltk(A, k) ] --[ Reveal(A) ]-> [ Out(k) ]
+
+
+rule Init_A:
+  [ Fr(~idA), !Ltk(A, ka), !Pk(B, pkb) ]
+
+  --[ Init('A', A, B), Init_('A') ]->
+
+  [ St_A_1(A, B, ~idA, ka, pkb) ]
+
+
+rule Init_B:
+  [ Fr(~idB), !Pk(A, pka), !Ltk(B, kb) ]
+
+  --[ Init('B', B, A), Init_('B') ]->
+
+  [ St_B_1(A, B, ~idB, pka, kb) ]
+
+
+rule A_1_send:
+  let gx = 'g'^~x
+      signgx = sign(gx, ka)
+  in
+  [ St_A_1(A, B, idA, ka, pkb), Fr(~x) ]
+
+  --[ Send(A, <gx, signgx, pk(ka)>),  ]->
+
+  [ St_A_2(A, B, idA, ka, pkb, ~x), Out(<gx, signgx, pk(ka)>) ]
+
+
+rule B_1_recv:
+  [ St_B_1(A, B, idB, pka, kb), In(<gx, signgx, pka>) ]
+
+  --[ Recv(B, <gx,signgx,pka>), _restrict(verify(signgx, gx, pka) = true) ]->
+
+  [ St_B_2(A, B, idB, pka, kb, gx) ]
+
+
+rule B_2_send:
+  let gy = 'g'^~y
+      signgy = sign(gy, kb)
+  in
+  [ St_B_2(A, B, idB, pka, kb, gx), Fr(~y) ]
+
+  --[ Send(B, <gy,signgy,pk(kb)>), Running(B, A, <'I','R',gx,gy>) ]->
+
+  [ St_B_3(A, B, idB, pka, kb, gx, ~y), Out(<gy, signgy, pk(kb)>) ]
+
+
+rule A_2_recv:
+  [ St_A_2(A, B, idA, ka, pkb, x), In(<gy, signgy, pkb>) ]
+
+  --[ Recv(B, <gy,signgy,pkb>), _restrict(verify(signgy, gy, pkb) = true),
+      Commit(A, B, <'I','R','g'^x, gy>), Finish() ]->
+
+  [ St_A_3(A, B, idA, ka, pkb, x, gy) ]
+
+
+lemma executable: exists-trace
+  " Ex #i.
+      Finish() @i &
+      not (Ex #j #k. Init_('A')@j & Init_('A')@k & not (#j = #k)) &
+      not (Ex #j #k. Init_('B')@j & Init_('B')@k & not (#j = #k)) &
+      not (Ex A #j. Reveal(A)@j)
+      "
+lemma attack_exists: exists-trace
+  " Ex A B E t #i #k.
+      Commit(A,B,<'I','R',t>)@i
+      & Running(B,E,<'I','R',t>)@k
+      & not (A=B|A=E|B=E)
+      & not (Ex k1 k2 #j #l. Register(A,k1)@j & Register(A,k2)@l & not (#j=#l))
+      & not (Ex k1 k2 #j #l. Register(B,k1)@j & Register(B,k2)@l & not (#j=#l))
+      & not (Ex k1 k2 #j #l. Register(E,k1)@j & Register(E,k2)@l & not (#j=#l))
+      & not (Ex C k1 #j. Register(C,k1)@j & not (C=A|C=B|C=E))
+      & (Ex #j. Init('A', A, B)@j)
+      & (Ex #j. Init('B', B, E)@j)
+      & (Ex #j. Init('A', E, B)@j)
+      & not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
+      & not (Ex #j. Running(B,A,<'I','R',t>)@j)
+      "
+lemma authentication:
+  " All A B E t #i #k.
+      Commit(A,B,<'I','R',t>)@i
+      & Running(B,E,<'I','R',t>)@k
+      & not (A=B|A=E|B=E)
+      & not (Ex k1 k2 #j #l. Register(A,k1)@j & Register(A,k2)@l & not (#j=#l))
+      & not (Ex k1 k2 #j #l. Register(B,k1)@j & Register(B,k2)@l & not (#j=#l))
+      & not (Ex k1 k2 #j #l. Register(E,k1)@j & Register(E,k2)@l & not (#j=#l))
+      & not (Ex C k1 #j. Register(C,k1)@j & not (C=A|C=B|C=E))
+      & (Ex #j. Init('A', A, B)@j)
+      & (Ex #j. Init('B', B, E)@j)
+      & (Ex #j. Init('A', E, B)@j)
+      & not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
+      ==> Ex #j. Running(B,A,<'I','R',t>)@j
+      "
+restriction two_initA_at_most:
+  " All #i #j #k. Init_('A')@i & Init_('A')@j & Init_('A')@k
+    ==> (#i=#j | #i=#k | #j=#k)
+    "
+restriction one_initB_at_most:
+  " All #i #j. Init_('B')@i & Init_('B')@j
+    ==> (#i=#j)
+    "
+restriction no_selftalk:
+  " All R A B #i. Init(R, A, B)@i ==> not (A=B) "
+
+end
