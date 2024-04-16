@@ -1,8 +1,6 @@
 theory P3
 begin
 
-builtins: multiset
-
 functions:
   mac/2, verify/3, true/0, kdf/3
 equations:
@@ -19,7 +17,7 @@ rule Register_key:
 rule Reveal_key:
   [ !SharedKey(A, B, k) ]
 
-  --[ Reveal(A,B) ]->
+  --[ Reveal(A), Reveal(B) ]->
 
   [ Out(k) ]
 
@@ -27,162 +25,130 @@ rule Reveal_key:
 rule Init_A:
   [ Fr(~idA), !SharedKey(A, B, k) ]
 
-  --[ Init_A(A, ~idA) ]->
+  --[ Init('I', A, ~idA), InitRole('I') ]->
 
-  [ St_A_1(A, <'k',k>+<'B',B>+<'idA',~idA>) ]
+  [ St_A_1(A, B, ~idA, k) ]
 
 
 rule Init_B:
   [ Fr(~idB), !SharedKey(A, B, k) ]
 
-  --[ Init_B(B, ~idB) ]->
+  --[ Init('R', B, ~idB), InitRole('R') ]->
 
-  [ St_B_1(B, <'k',k>+<'A',A>+<'idB',~idB>) ]
+  [ St_B_1(A, B, ~idB, k) ]
 
 
 rule A_1_send:
-  [ Fr(~x), St_A_1(A, stA) ]
+  [ St_A_1(A, B, idA, k), Fr(~x) ]
 
   --[ Send(A, ~x) ]->
 
-  [ St_A_2(A, <'x',~x>+stA), Out(~x) ]
+  [ St_A_2(A, B, idA, k, ~x), Out(~x) ]
 
 
 rule B_1_recv:
-  [ St_B_1(B, stB), In(x) ]
+  [ St_B_1(A, B, idB, k), In(x) ]
 
   --[ Recv(B, x) ]->
 
-  [ St_B_2(B, <'x',x>+stB) ]
+  [ St_B_2(A, B, idB, k, x) ]
 
 
 rule B_2_send:
-  let stB = <'x',x>+<'A',A>+rest
-  in
-  [ Fr(~y), St_B_2(B, stB) ]
+  [ St_B_2(A, B, idB, k, x), Fr(~y) ]
 
   --[ Send(B, ~y), Running(B,A,<'I','R',x,~y>) ]->
 
-  [ St_B_3(B, <'y',~y>+stB), Out(~y) ]
+  [ St_B_3(A, B, idB, k, x, ~y), Out(~y) ]
 
 
 rule A_2_recv:
-  let stA = <'x',x>+<'B',B>+rest
-  in
-  [ St_A_2(A, stA), In(y) ]
+  [ St_A_2(A, B, idA, k, x), In(y) ]
 
   --[ Recv(A, y), Running(A,B,<'R','I',x,y>) ]->
 
-  [ St_A_3(A, <'y',y>+stA) ]
+  [ St_A_3(A, B, idA, k, x, y) ]
 
 
 rule B_3_send:
-  let stB = <'k',k>+<'x',x>+<'y',y>+rest
-      dk = kdf(k,x,y)
+  let dk = kdf(k,x,y)
       macx = mac(x,dk)
   in
-  [ St_B_3(B, stB) ]
+  [ St_B_3(A, B, idB, k, x, y) ]
 
   --[ Send(B, macx) ]->
 
-  [ St_B_4(B, <'macx',macx>+stB), Out(macx) ]
+  [ St_B_4(A, B, idB, k, x, y), Out(macx) ]
 
 
 rule A_3_recv:
-  let stA = <'k',k>+<'x',x>+<'y',y>+rest
-      dk = kdf(k,x,y)
-      macx = mac(x,dk)
+  let dk = kdf(k,x,y)
   in
-  [ St_A_3(A, stA), In(macx) ]
+  [ St_A_3(A, B, idA, k, x, y), In(macx) ]
 
-  --[ Recv(A, macx) ]->
+  --[ Recv(A, macx), _restrict(verify(dk, x, macx) = true) ]->
 
-  [ St_A_4(A, <'macx',macx>+stA) ]
+  [ St_A_4(A, B, idA, k, x, y) ]
 
 
 rule A_4_send:
-  let stA = <'k',k>+<'x',x>+<'y',y>+<'B',B>+rest
-      dk = kdf(k,x,y)
+  let dk = kdf(k,x,y)
       macy = mac(y,dk)
   in
-  [ St_A_4(A, stA) ]
+  [ St_A_4(A, B, idA, k, x, y) ]
 
   --[ Send(A, macy), Commit(A,B,<'I','R',x,y>), Secret(A,B,dk) ]->
 
-  [ St_A_5(A, <'macy',macy>+stA), Out(macy) ]
+  [ St_A_5(A, B, idA, k, x, y), Out(macy) ]
 
 
 rule B_4_recv:
-  let stB = <'k',k>+<'x',x>+<'y',y>+<'A',A>+rest
-      dk = kdf(k,x,y)
-      macy = mac(y,dk)
+  let dk = kdf(k,x,y)
   in
-  [ St_B_4(B, stB), In(macy) ]
+  [ St_B_4(A, B, idB, k, x, y), In(macy) ]
 
-  --[ Recv(B, macy), Finish(), Commit(B,A,<'R','I',x,y>), Secret(B,A,dk) ]->
+  --[ Recv(B, macy), Finish(), Commit(B,A,<'R','I',x,y>), Secret(B,A,dk), _restrict(verify(dk, y, macy) = true) ]->
 
-  [ St_B_5(B, <'macy',macy>+stB) ]
+  [ St_B_5(A, B, idB, k, x, y) ]
 
-
-lemma UnidirectionalKey:
-  " All a b k1 k2 #i #j.
-      not (a = b) & Register(a, b, k1)@i & Register(b, a, k2)@j ==> not (k1 = k2)"
-
-lemma executable_restricted: exists-trace
-  " Ex #i.
-      Finish() @i &
-      not (Ex I1 I2 id1 id2 #j #k. Init_A(I1, id1)@j & Init_A(I2, id2)@k & not (#j = #k)) &
-      not (Ex I1 I2 id1 id2 #j #k. Init_B(I1, id1)@j & Init_B(I2, id2)@k & not (#j = #k)) &
-      not (Ex A B #j. Reveal(A, B)@j)"
 
 lemma executable: exists-trace
-  " Ex #i.
-      Finish() @i &
-      not (Ex I1 I2 id1 id2 #j #k. Init_A(I1, id1)@j & Init_A(I2, id2)@k & not (#j = #k)) &
-      not (Ex A B #j. Reveal(A, B)@j)"
-
+  " Ex #i. Finish()@i &
+    not (Ex R A B id1 id2 #i #j. Init(R, A, id1)@i & Init(R, B, id2)@j & not (#i = #j)) &
+    not (Ex A #i. Reveal(A)@i)
+    "
 lemma noninjectiveagreementINITIATOR:
   " All A B t #i.
       Commit(A,B,<'I','R',t>)@i &
-        not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
-      ==> (Ex #j. Running(B,A,<'I','R',t>)@j)"
-
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
+      ==> (Ex #j. Running(B,A,<'I','R',t>)@j)
+      "
 lemma injectiveagreementINITIATOR:
   " All A B t #i.
       Commit(A,B,<'I','R',t>)@i &
-        not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
       ==> (Ex #j. Running(B,A,<'I','R',t>)@j
         & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>)@i2
-          & not (#i2 = #i)))"
-
+          & not (#i2 = #i)))
+          "
 lemma noninjectiveagreementRESPONDER:
   " All A B t #i.
       Commit(A,B,<'R','I',t>)@i &
-        not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
-      ==> (Ex #j. Running(B,A,<'R','I',t>)@j)"
-
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
+      ==> (Ex #j. Running(B,A,<'R','I',t>)@j)
+      "
 lemma injectiveagreementRESPONDER:
   " All A B t #i.
       Commit(A,B,<'R','I',t>)@i &
-        not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
       ==> (Ex #j. Running(B,A,<'R','I',t>)@j
         & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>)@i2
-          & not (#i2 = #i)))"
-
+          & not (#i2 = #i)))
+          "
 lemma secrecy:
   " All A B x #i.
       Secret(A,B,x)@i &
-        not ((Ex #r. Reveal(A,B)@r) | (Ex #r. Reveal(B,A)@r))
-      ==> not (Ex #j. K(x)@j)"
-
-// restrict to get simpler attacks
-restriction one_A_at_most:
-  " not (Ex Name1 Id1 Name2 Id2 #i #j. Init_A(Name1, Id1) @i & Init_A(Name2, Id2) @j & not (#i = #j)) "
-
-// restriction one_B_at_most:
-//   " not (Ex Name1 Id1 Name2 Id2 #i #j. Init_B(Name1, Id1) @i & Init_B(Name2, Id2) @j & not (#i = #j)) "
-
-// restriction one_k_at_most:
-//   " not (Ex Name1 Name2 k1 k2 #i #j. Register(Name1, Name2, k1) @i & Register(Name1, Name2, k2) @j & not (#i = #j)) "
-
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
+      ==> not (Ex #j. K(x)@j)
+      "
 end
