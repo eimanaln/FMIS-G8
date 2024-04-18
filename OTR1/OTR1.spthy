@@ -4,7 +4,7 @@ begin
 builtins: signing, diffie-hellman
 
 rule Register_key:
-  [ Fr(~k) ] --[ Register($A, ~k) ]-> [ !Ltk($A, ~k), !Pk($A, pk(~k)), Out(pk(~k)) ]
+  [ Fr(~k) ] --[ Register($A, ~k), Reg_() ]-> [ !Ltk($A, ~k), !Pk($A, pk(~k)), Out(pk(~k)) ]
 
 rule Reveal_key:
   [ !Ltk(A, k) ] --[ Reveal(A) ]-> [ Out(k) ]
@@ -13,7 +13,7 @@ rule Reveal_key:
 rule Init_A:
   [ Fr(~idA), !Ltk(A, ka), !Pk(B, pkb) ]
 
-  --[ Init('I', A, ~idA, B), Init_('I') ]->
+  --[ Init('I', A, ~idA, B), Init2('I') ]->
 
   [ St_A_1(A, B, ~idA, ka, pkb) ]
 
@@ -21,7 +21,7 @@ rule Init_A:
 rule Init_B:
   [ Fr(~idB), !Pk(A, pka), !Ltk(B, kb) ]
 
-  --[ Init('R', B, ~idB, A), Init_('R')]->
+  --[ Init('R', B, ~idB, A), Init2('R')]->
 
   [ St_B_1(A, B, ~idB, pka, kb) ]
 
@@ -68,11 +68,17 @@ rule A_2_recv:
 lemma executable: exists-trace
   " Ex #i.
       Finish() @i &
+      (Ex #i. Init2('I')@i) &
+      (Ex #i. Init2('R')@i) &
       not (Ex A #j. Reveal(A)@j)"
 
-restriction one_init_per_role_at_most:
-  " All R #i #j. Init_(R)@i & Init_(R)@j ==> (#i=#j) "
+restriction two_k_at_most:
+  " All #i #j #k. Reg_()@i & Reg_()@j & Reg_()@k ==> (#i=#j|#i=#k|#j=#k) "
 
+restriction three_inits_at_most:
+  " All R1 R2 R3 R4 #i #j #k #l. Init2(R1)@i & Init2(R2)@j & Init2(R3)@k & Init2(R4)@l
+    ==> (#i=#j|#i=#k|#i=#l|#j=#k|#j=#l|#k=#l)
+  "
 restriction no_selftalk:
   " All R A id B #i. Init(R, A, id, B)@i ==> not (A=B) "
 

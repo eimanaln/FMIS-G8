@@ -47,33 +47,33 @@ rule A_1_send:
 
 
 rule B_1_recv:
-  [ St_B_1(A, B, idB, kab, kba), In(x) ]
+  [ St_B_1(A, B, idB, kab, kba), In(~x) ]
 
-  --[ Recv(B, x) ]->
+  --[ Recv(B, ~x) ]->
 
-  [ St_B_2(A, B, idB, kab, kba, x) ]
+  [ St_B_2(A, B, idB, kab, kba, ~x) ]
 
 
 rule B_2_send:
   [ St_B_2(A, B, idB, kab, kba, x), Fr(~y) ]
 
-  --[ Send(B, ~y), Running(B,A,<'I','R',x,~y>) ]->
+  --[ Send(B, <~y, mac(<x,~y>,kba)>), Running(B,A,<'I','R',x,~y>) ]->
 
   [ St_B_3(A, B, idB, kab, kba, x, ~y), Out(~y) ]
 
 
 rule A_2_recv:
-  [ St_A_2(A, B, idA, kab, kba, x), In(y) ]
+  [ St_A_2(A, B, idA, kab, kba, x), In(~y) ]
 
-  --[ Recv(A, y), Running(A,B,<'R','I',x,y>) ]->
+  --[ Recv(A, ~y), Running(A,B,<'R','I',x,~y>) ]->
 
-  [ St_A_3(A, B, idA, kab, kba, x, y) ]
+  [ St_A_3(A, B, idA, kab, kba, x, ~y) ]
 
 
 rule B_3_send:
   [ St_B_3(A, B, idB, kab, kba, x, y) ]
 
-  --[ Send(B, mac(x,kba)) ]->
+  --[ Send(B, mac(<x,y>,kba)) ]->
 
   [ St_B_4(A, B, idB, kab, kba, x, y), Out(mac(<x,y>,kba)) ]
 
@@ -141,8 +141,8 @@ lemma injectiveagreementRESPONDER:
           "
 
 // restrict to get simpler attacks
-restriction three_initiators_at_most:
-  " All #i #j #k #l. InitRole('I')@i & InitRole('I')@j & InitRole('I')@k & InitRole('I')@l
-      ==> (#i=#j|#i=#k|#i=#l|#j=#k|#j=#l|#k=#l)
-      "
+// restriction three_initiators_at_most:
+//   " All #i #j #k #l. InitRole('I')@i & InitRole('I')@j & InitRole('I')@k & InitRole('I')@l
+//       ==> (#i=#j|#i=#k|#i=#l|#j=#k|#j=#l|#k=#l)
+//       "
 end
