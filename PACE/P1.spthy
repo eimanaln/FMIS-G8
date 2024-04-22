@@ -1,78 +1,95 @@
-
 theory P1
 begin
- 
-builtins: symmetric-encryption
-// define mac function 
-functions: mac/2
-// TODO: Add equation here for the mac function
-equations: 
-mac(m,k) = senc(m,k)
 
+functions:
+  mac/2, verify/3, true/0
+equations:
+  verify(k, m, mac(m, k)) = true
 
-// setup phase 
-// Alice and Bob each have their own secret key 
 rule Setup_sk:
-[Fr(~k)]--[UnidirectionalKey($A, $B, ~k)]->[!Setup_sk($A, $B, ~k)]
+  [ Fr(~k) ]
 
-// Reveal rules
-// Compromise an agent's key (pg. 59 in Tamarin manual under secrecy rule)
-rule reveal_sk_A:
-[!Setup_sk($A, $B, k)]--[Reveal( $A )]->[Out(k)]
+  --[ UnidirectionalKey($A, $B, ~k) ]->
 
-rule reveal_sk_B:
-[!Setup_sk($A, $B, k)]--[Reveal( $B )]->[Out(k)]
+  [ !SharedKey($A, $B, ~k) ]
 
-// modeling the protocol 
-// TODO: is fresh idenity imporant? 
-// To achieve tagging, I added INITATOR and RESPONDER to messages 
-rule Alice_0: 
-[Fr(~id), !Setup_sk(A, B, k) ]-->[Alice_0(A, B, k , ~id)]
+// reveal rules
+rule Reveal_key:
+  [ !SharedKey(A, B, k) ]
 
-rule Bob_0: 
-[Fr(~id), !Setup_sk(A, B, k) ]-->[Bob_0(B, A, k , ~id)]
+  --[ Reveal(A), Reveal(B) ]->
+
+  [ Out(k) ]
 
 
-rule Alice_1:
-[Fr(~x), Alice_0(A, B, k , id)]-->[Alice_1(A, B, k , id, ~x), Out(<'INITIATOR',~x>)]
+// protocol starts here
+rule Init_A:
+  [ Fr(~idA), !SharedKey(B, A, kba) ]
 
-rule Bob_1:
-[Bob_0(B, A, k , id), In(<'INITIATOR',x>)]--[ Running(B,A,<'I','R',x>) ]->[Bob_1(B, A, k , id, x)]
+  --[ Init('I', A, ~idA) ]->
 
-
-rule Bob_2:
-[Bob_1(B, A, k , id, x)]-->[Bob_2(B, A, k , id, x), Out(<'RESPONDER',mac(x,k)>)]
+  [ St_A_1(A, ~idA, kba, B) ]
 
 
-rule Alice_2:
-[Alice_1(A, B, k , id, x), In(<'RESPONDER',mac(x,k)>)]--[ Commit(A, B, <'I', 'R', x>), Finish() ]->[Alice_2(A, B, k , id, x)]
+rule Init_B:
+  [ Fr(~idB), !SharedKey(B, A, kba) ]
+
+  --[ Init('R', B, ~idB) ]->
+
+  [ St_B_1(B, ~idB, kba, A) ]
 
 
-// unidirectional key 
-// TODO: verify this is correct 
+rule A_1_send:
+  [ Fr(~x), St_A_1(A, ~idA, kba, B) ]
 
-restriction UnidirectionalKey:
-" All a b k #i. 
-      UnidirectionalKey(a, b, k) @i & UnidirectionalKey(b, a, k) @i & not (a = b) ==> F  
-"
+  -->
 
-// executability lemma? 
-// Tamarin book draft pg. 69: use finish 
-// According to book, each agent must have an executability rule and it shouldn't involve adversary's help 
-lemma executable: 
-exists-trace
-" 
-Ex #i. (Finish() @i) & (not (Ex A #j. Reveal(A) @j))
-"
+  [ St_A_2(A, ~idA, kba, B, ~x), Out(<'INITIATOR', ~x>) ]
 
 
-// authentication property that A injectively agrees with B on the nonce x
+rule B_1_recv:
+  [ St_B_1(B, ~idB, kba, A), In(<'INITIATOR',x>) ]
+
+  --[ Running(B, A, <'I','R',x>)  ]->
+
+  [ St_B_2(B, ~idB, kba, A, x) ]
+
+
+rule B_2_send:
+  [ St_B_2(B, ~idB, kba, A, x) ]
+
+  -->
+
+  [ St_B_3(B, ~idB, kba, A, x, mac(x, kba)), Out(<'RESPONDER',mac(x, kba)>) ]
+
+
+
+rule A_2_recv:
+  [ St_A_2(A, ~idA, kba, B, x), In(<'RESPONDER', macx>) ]
+
+  --[ Finish(), Commit(A, B, <'I','R',x>), _restrict(verify(kba, x, macx) = true) ]->
+
+  [ St_A_3(A, ~idA, kba, B, x) ]
+
+// verified by tamarin
+lemma UnidirectionalKey:
+  " All a b k1 k2 #i #j.
+      not (a = b) & Register(a, b, k1)@i & Register(b, a, k2)@j ==> not (k1 = k2)
+      "
+
+// verified by tamarin
+lemma executable: exists-trace
+  " Ex #i. Finish()@i &
+    not (Ex R A B id1 id2 #i #j. Init(R, A, id1)@i & Init(R, B, id2)@j & not (#i = #j)) &
+    not (Ex A #i. Reveal(A)@i)
+    "
+// verified by tamarin
 lemma injectiveagreementINITIATOR:
-  "All a b t #i.
-    Commit(a,b,<'I','R',t>)@i &
-    not ((Ex #r. Reveal(a)@r) | (Ex #r. Reveal(b)@r))
-    ==> (Ex #j. Running(b,a,<'I','R',t>)@j
+  " All A B t #i.
+      Commit(A,B,<'I','R',t>)@i &
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
+      ==> (Ex #j. Running(B,A,<'I','R',t>)@j
         & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>)@i2
-                           & not (#i2 = #i)))"
-
+          & not (#i2 = #i)))
+          "
 end
