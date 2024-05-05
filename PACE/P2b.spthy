@@ -1,4 +1,4 @@
-theory P2a
+theory P2b
 begin
 
 functions:
@@ -83,16 +83,17 @@ rule A_2_recv:
   [ St_A_3(A, B, idA, kab, kba, x, y) ]
 
 // Alice returns MAC(y, kab) to Bob
+// Fix is added here 
 rule A_3_send:
   [ St_A_3(A, B, idA, kab, kba, x, y)]
   -->
-  [ St_A_4(A, B, idA, kab, kba, x, y), Out(<'RESPONDER_A', mac(y,kab)>)]
+  [ St_A_4(A, B, idA, kab, kba, x, y), Out(<'RESPONDER_A', mac(<x,y>,kab)>)]
 
 // Bob recvs MAC(y, kab) from Alice and verifies it 
 rule B_3_recv:
-  [ St_B_3(B, A, idB, kba, kab, x, y), In(<'RESPONDER_A', macy>) ]
+  [ St_B_3(B, A, idB, kba, kab, x, y), In(<'RESPONDER_A', macxy>) ]
 
-  --[ _restrict(verify(kab, y, macy) = true), 
+  --[ _restrict(verify(kab, <x,y>, macxy) = true), 
       Commit(B, A, <'R', 'I', x, y>) ]->
 
   [ St_B_4(B, A, idB, kba, kab, x, y) ]
@@ -101,18 +102,18 @@ rule B_3_recv:
 rule B_4_send:
   [ St_B_4(B, A, idB, kba, kab, x, y) ]
 
-  --[Finish(B ,A, 'R', kab, kba, x, y)]->
+  --[Finish(B, A, 'R', kab, kba, x, y)]->
 
-  [ St_B_5(B, A, idB, kba, kab, x, y), Out(<'RESPONDER_B', mac(x,kba)>) ]
+  [ St_B_5(B, A, idB, kba, kab, x, y), Out(<'RESPONDER_B', mac(<x,y>,kba)>) ]
 
 
 // Bob recvs MAC(x, kab) from Bob and verifies it 
 rule A_4_recv:
-  [ St_A_4(A, B, idA, kab, kba, x, y), In(<'RESPONDER_B',macx>) ]
+  [ St_A_4(A, B, idA, kab, kba, x, y), In(<'RESPONDER_B',macxy>) ]
 
   --[Finish(A, B, 'I', kba, kab, x, y), 
      Commit(A,B,<'I','R',x,y>), 
-      _restrict(verify(kba, x, macx) = true) ]->
+      _restrict(verify(kba, <x,y>, macxy) = true) ]->
 
   [ St_A_5(A, B, idA, kab, kba, x, y) ]
 
@@ -134,7 +135,7 @@ exists-trace
             & not(Ex X #k. Reveal(X)@k)
     "
 
-/* Not verified by tamarin*/
+/* verified by tamarin*/
 lemma injectiveagreementINITIATOR:
   " All A B t #i.
       Commit(A,B,<'I','R',t>)@i &
@@ -144,7 +145,7 @@ lemma injectiveagreementINITIATOR:
           & not (#i2 = #i)))
           "
 
-/* Not verified by tamarin*/
+/* verified by tamarin*/
 lemma injectiveagreementRESPONDER:
   " All A B t #i.
       Commit(A,B,<'R','I',t>)@i &
