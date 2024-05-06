@@ -1,5 +1,8 @@
-theory P3a
+theory P4
 begin
+
+builtins:
+  hashing, symmetric-encryption
 
 functions:
   mac/2, verify/3, true/0, kdf/3
@@ -56,85 +59,85 @@ rule Init_B:
 
 // Alice sends nonce x to Bob
 rule A_1_send:
-  [ St_A_1(A, B, idA, k), Fr(~x) ]
+  [ St_A_1(A, B, idA, k), Fr(~x), Fr(~s) ]
    -->
-   [ St_A_2(A, B, idA, k, ~x), Out(<'NONCE_X', ~x>) ]
+   [ St_A_2(A, B, idA, k, ~x, ~s), Out(<'NONCES_A',senc(~s, h(k)), ~x>) ]
 
 // Bob recvs nonce x from Bob
 rule B_1_recv:
-  [ St_B_1(B, A, idB, k), In(<'NONCE_X', x>) ]
+  [ St_B_1(B, A, idB, k), In(<'NONCES_A', senc(s, h(k)), x>) ]
   -->
-  [ St_B_2(B, A, idB, k, x) ]
+  [ St_B_2(B, A, idB, k, x, s) ]
 
 // Bob sends nonce y to Alice
 // establish session key 
 rule B_2_send:
 
-let kab = kdf(k, x, ~y)
+let kab = kdf(s, x, ~y)
 
 in 
 
-  [ St_B_2(B, A, idB, k, x), Fr(~y) ]
+  [ St_B_2(B, A, idB, k, x, s), Fr(~y) ]
 
   --[ Running(B, A,<'I','R', x, ~y, kab>) ]->
 
-  [ St_B_3(B, A, idB, k, x, ~y, kab), Out(<'NONCE_Y', ~y>) ]
+  [ St_B_3(B, A, idB, k, x, s, ~y, kab), Out(<'NONCE_B', ~y>) ]
 
 // Alice recvs nonce y from Bob
 rule A_2_recv:
 
-let kab = kdf(k, x, y)
+let kab = kdf(s, x, y)
 
 in 
-  [ St_A_2(A, B, idA, k, x), In(<'NONCE_Y', y>) ]
+  [ St_A_2(A, B, idA, k, x,s), In(<'NONCE_B', y>) ]
 
   --[ Running(A, B, <'R','I', x, y, kab>) ]->
 
-  [ St_A_3(A, B, idA, k, x, y, kab) ]
+  [ St_A_3(A, B, idA, k, x, s, y, kab) ]
 
 
 // Alice returns MAC(<'I', y>, kab) to Bob
 // Tag the message with the role of agent A
 rule A_3_send:
 
-let kab = kdf(k, x, y) 
+let kab = kdf(s, x, y) 
 
 in 
-  [ St_A_3(A, B, idA, k, x, y, kab)]
+  [ St_A_3(A, B, idA, k, x, s, y, kab)]
   -->
-  [ St_A_4(A, B, idA, k, x, y, kab), Out(<'MAC_Y', mac(<'I', y>,kab)>)]
+  [ St_A_4(A, B, idA, k, x, s, y, kab), Out(<'MAC_Y', mac(<'I', y>,kab)>)]
 
 // Bob recvs MAC(y, kab) from Alice and verifies it 
 rule B_3_recv:
-let kab = kdf(k, x, y)
+let kab = kdf(s, x, y)
 in 
-  [ St_B_3(B, A, idB, k, x, y, kab), In(<'MAC_Y', macy>) ]
+  [ St_B_3(B, A, idB, k, x, s, y, kab), In(<'MAC_Y', macy>) ]
 
   --[ _restrict(verify(kab, <'I', y>, macy) = true), 
 
       Commit(B, A, <'R', 'I', x, y, kab>) ]->
 
-  [ St_B_4(B, A, idB, k, x, y, kab) ]
+  [ St_B_4(B, A, idB, k, x, s, y, kab) ]
 
 // Bob sends MAC(x, kab) to Alice
 rule B_4_send:
-let kab = kdf(k, x, y)
+let kab = kdf(s, x, y)
 in 
-  [ St_B_4(B, A, idB, k, x, y, kab) ]
+  [ St_B_4(B, A, idB, k, x, s, y, kab) ]
 
   --[Finish(B, A, 'R', x, y, kab),
 
       Secret(A, B, kab) ]->
 
-  [ St_B_5(B, A, idB, k, x, y, kab), Out(<'MAC_X', mac(<'R', x>,kab)>) ]
+  [ St_B_5(B, A, idB, k, x, s, y, kab), Out(<'MAC_X', mac(<'R', x>,kab)>) ]
 
 
 // Bob recvs MAC(<'R', x>, kab) from Bob and verifies it 
 // Tag the message with role of agent B
 rule A_4_recv: 
-let kab = kdf(k, x, y)
+let kab = kdf(s, x, y)
 in
-  [ St_A_4(A, B, idA, k, x, y, kab), In(<'MAC_X',macx>) ]
+  [ St_A_4(A, B, idA, k, x, s, y, kab), In(<'MAC_X',macx>) ]
 
   --[ _restrict(verify(kab, <'R', x>, macx) = true), 
 
@@ -144,7 +147,7 @@ in
     
     Finish(A, B, 'I', x, y, kab) ]->
 
-  [ St_A_5(A, B, idA, k, x, y, kab) ]
+  [ St_A_5(A, B, idA, k, x, s, y, kab) ]
 
 
 /*----------------------------------------*/
