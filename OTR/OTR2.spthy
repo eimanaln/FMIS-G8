@@ -1,4 +1,4 @@
-theory OTR1
+theory OTR2
 begin
 
 
@@ -90,7 +90,6 @@ in
 restriction Equality:
   "All x y #i. Eq(x,y) @i ==> x = y"
 
-
 /* verified by tamarin */
 lemma executable: 
 exists-trace
@@ -103,17 +102,22 @@ exists-trace
 
     "
 
-/*
+
+/*not verified by tamarin*/
+/* Look at tamarin manual page 17*/  
+
 lemma injectiveagreementINITIATOR:
   " All A B t #i.
-      Commit(A,B,<'I','R',t>)@i &
-        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
+      Commit(A,B,<'I','R',t>)@i 
+       & not (Ex R A B id1 id2 #i #j. Init(R, A, id1)@i & Init(R, B, id2)@j & not (#i = #j))
+         & (Ex a2 b2 #j. Running(b2,a2,<'I','R',t> ) @j)
+            & not (A = B) 
       ==> (Ex #j. Running(B,A,<'I','R',t>)@j
-        & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>)@i2
-          & not (#i2 = #i)))
+        & not (Ex a3 b3 #i3. Commit(a3,b3,<'I','R',t>)@i3
+          & not (#i3 = #i))) | ((Ex #r. Reveal(A)@r & (r < i)) | (Ex #r. Reveal(B)@r &(r < i)))
           "
 
-
+/*
 lemma injectiveagreementRESPONDER:
   " All A B t #i.
       Commit(A,B,<'R','I',t>)@i &
@@ -127,7 +131,8 @@ lemma secrecy:
   "All A B x #i.
     Secret(A,B,x)@i &
     not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
-    ==> not (Ex #j. K(x)@j)" */
+    ==> not (Ex #j. K(x)@j)"
  
+*/ 
 
 end
