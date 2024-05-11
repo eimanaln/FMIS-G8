@@ -1,0 +1,132 @@
+theory OTR1
+begin
+
+
+builtins: signing, diffie-hellman, hashing
+
+rule Generate_key_pair:
+  [ Fr(~sk) ] --> [ !Ltk($A, ~sk), !Pk($A, pk(~sk)), Out(pk(~sk)) ]
+
+/* rule Reveal_secret_key:
+  [ !Ltk(A, sk) ] --[ Reveal(A) ]-> [ Out(sk) ] */ 
+
+
+// Reveal Rules 
+rule Reveal_secret_key_A:
+  [ !Ltk(A, sk) ]--[ Reveal(A)]->[ Out(sk) ]
+
+
+rule Reveal_secret_key_B:
+  [ !Ltk(B, sk) ]--[Reveal(B) ]->[ Out(sk) ]
+
+/*----------------------------------------*/
+
+rule Init_A:
+  [ Fr(~idA), !Ltk(A, ka), !Pk(B, pkb) ]
+
+  --[ Init('I', A, ~idA)]->
+
+  [ St_A_1(A, B, ~idA, ka, pkb) ]
+
+
+rule Init_B:
+  [ Fr(~idB), !Ltk(B, kb), !Pk(A, pka), ]
+
+  --[ Init('R', B, ~idB)]->
+
+  [ St_B_1(A, B, ~idB, pka, kb) ]
+
+
+/*----------------------------------------*/
+
+
+rule A_1_send:
+  let gx = 'g'^~x
+      signgx = sign(gx, ka)
+  in
+  [ St_A_1(A, B, idA, ka, pkb), Fr(~x) ]
+
+  -->
+
+  [ St_A_2(A, B, idA, ka, pkb, ~x), Out(<gx, signgx, pk(ka)>) ]
+
+
+rule B_1_recv:
+  [ St_B_1(A, B, idB, pka, kb), In(<gx, signgx, pka>) ]
+
+  --[ Eq(verify(signgx, gx, pka),true) ]->
+
+  [ St_B_2(A, B, idB, pka, kb, gx) ]
+
+
+rule B_2_send:
+  let gy = 'g'^~y
+      signgy = sign(gy, kb)
+      kab = h(gx^~y)
+  in
+  [ St_B_2(A, B, idB, pka, kb, gx), Fr(~y) ]
+
+  --[ Running(B, A, <'I','R', gx, gy>), 
+      Finish(B, A, 'R', gx, gy, kab),
+      Secret(A, B, kab) ]->
+
+  [ St_B_3(A, B, idB, pka, kb, gx, ~y, kab), Out(<gy, signgy, pk(kb)>) ]
+
+
+rule A_2_recv:
+let kab = h(gy^x)
+    gx  = 'g'^x
+in 
+  [ St_A_2(A, B, idA, ka, pkb, x), In(<gy, signgy, pkb>) ]
+
+  --[ Eq(verify(signgy, gy, pkb),true),
+      Commit(A, B, <'I','R', gx, gy>), 
+       Finish(A, B, 'I', gx , gy, kab), 
+       Secret(A, B, kab) ]->
+
+  [ St_A_3(A, B, idA, ka, pkb, x, gy, kab) ]
+
+
+restriction Equality:
+  "All x y #i. Eq(x,y) @i ==> x = y"
+
+
+lemma executable: 
+exists-trace
+  " Ex A B gx gy kab #i #j.
+      Finish(B, A, 'R', gx, gy, kab) @i 
+        & Finish(A, B, 'I', gx, gy, kab) @j 
+          & not (Ex R A B id1 id2 #i #j. Init(R, A, id1)@i & Init(R, B, id2)@j & not (#i = #j))
+            & not (A = B)
+               & not(Ex X #k. Reveal(X)@k)
+
+    "
+
+/*
+lemma injectiveagreementINITIATOR:
+  " All A B t #i.
+      Commit(A,B,<'I','R',t>)@i &
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
+      ==> (Ex #j. Running(B,A,<'I','R',t>)@j
+        & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>)@i2
+          & not (#i2 = #i)))
+          "
+
+
+lemma injectiveagreementRESPONDER:
+  " All A B t #i.
+      Commit(A,B,<'R','I',t>)@i &
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
+      ==> (Ex #j. Running(B,A,<'R','I',t>)@j
+        & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>)@i2
+          & not (#i2 = #i)))
+          "
+
+lemma secrecy:
+  "All A B x #i.
+    Secret(A,B,x)@i &
+    not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
+    ==> not (Ex #j. K(x)@j)"
+*/ 
+
+end
