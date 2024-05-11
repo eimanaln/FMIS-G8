@@ -67,7 +67,7 @@ in
 
 // I think it is weird that B has s here, it didn't event decrypt the message 
 rule B_1_recv:
-let g = map(s, $p)
+let gx = map(s, $p)^x // match to avoid DH_neutral
 in 
   [ St_B_1(B, A, idB, k), In(<'SEND_A', senc(s, h(k)), gx, $p>) ]
   -->
@@ -91,6 +91,7 @@ in
 rule A_2_recv:
 
 let g = map(s, $p)
+    gy = g^y // match to avoid DH_neutral
     kab = h(gy^x)
 
 in 
