@@ -1,0 +1,207 @@
+theory P5d
+begin
+
+builtins:
+  hashing, symmetric-encryption, diffie-hellman
+
+functions:
+  mac/2, verify/3, true/0, kdf/3, map/2
+equations:
+  verify(k, m, mac(m, k)) = true
+
+// Set up symmetric LTK shared between A and B 
+// k here means ltk
+rule Setup_LTK:
+  [ Fr(~k) ]
+  -->
+  [ !SharedKey($A, $B, ~k) ]
+
+/*----------------------------------------*/
+
+// Reveal Rules 
+rule Reveal_LTK_A:
+  [ !SharedKey(A, B, k) ]
+
+  --[ Reveal(A)]->
+
+  [ Out(k) ]
+
+
+rule Reveal_LTK_B:
+  [ !SharedKey(A, B, k) ]
+
+  --[Reveal(B) ]->
+
+  [ Out(k) ]
+
+/*----------------------------------------*/
+
+// Initalize states
+rule Init_A:
+  [ Fr(~idA), !SharedKey(A, B, k)]
+
+  --[ Init('I', A, ~idA) ]->
+
+  [ St_A_1(A, B, ~idA, k) ]
+
+
+rule Init_B:
+  [ Fr(~idB), !SharedKey(A, B, k) ]
+
+  --[ Init('R', B, ~idB) ]->
+
+  [ St_B_1(B, A, ~idB, k) ]
+
+/*----------------------------------------*/
+
+
+// Protocol starts here 
+
+// Alice sends gx, p and [s]_{h(k)} to Bob
+rule A_1_send:
+let g = map(~s, $p)
+in
+  [ St_A_1(A, B, idA, k), Fr(~x), Fr(~s) ]
+   -->
+   [ St_A_2(A, B, idA, k, ~x, ~s, $p), Out(<senc(~s, h(k)), g^~x, $p>) ]
+
+// I think it is weird that B has s here, it didn't event decrypt the message 
+rule B_1_recv:
+let g = map(s, $p)
+in 
+  [ St_B_1(B, A, idB, k), In(<senc(s, h(k)), gx, $p>) ]
+  -->
+  [ St_B_2(B, A, idB, k, s, $p, gx) ]
+
+// Bob sends nonce gy to Alice
+rule B_2_send:
+
+let g = map(s, $p)
+    kab = h(gx^~y)
+
+in 
+
+  [ St_B_2(B, A, idB, k, s, $p, gx), Fr(~y) ]
+
+  --[ Running(B, A,<'I','R', gx, g^~y, kab>) ]->
+
+  [ St_B_3(B, A, idB, k, s, $p, gx, ~y, kab), Out(g^~y) ]
+
+// Alice recvs nonce y from Bob
+rule A_2_recv:
+
+let g = map(s, $p)
+    kab = h(gy^x)
+
+in 
+  [ St_A_2(A, B, idA, k, x, s, $p), In(gy) ]
+
+  --[ Running(A, B, <'R','I', g^x, gy, kab>) ]->
+
+  [ St_A_3(A, B, idA, k, x, s, $p, gy, kab) ]
+
+
+// Alice returns MAC(<'I', gy>, kab) to Bob
+// Tag the message with the role of agent A
+rule A_3_send:
+
+let g = map(s, $p)
+
+in 
+  [ St_A_3(A, B, idA, k, x, s, $p, gy, kab)]
+  -->
+  [ St_A_4(A, B, idA, k, x, s, $p, gy, kab), Out(mac(gy,kab))]
+
+// Bob recvs MAC(y, kab) from Alice and verifies it 
+rule B_3_recv:
+
+let g = map(s, $p)
+
+in 
+  [ St_B_3(B, A, idB, k, s, $p, gx, y, kab), In(mac(g^y,kab)) ]
+
+  --[ Commit(B, A, <'R', 'I', gx, g^y, kab>) ]->
+
+  [ St_B_4(B, A, idB, k, s, $p, gx, y, kab) ]
+
+// Bob sends MAC(x, kab) to Alice
+rule B_4_send:
+
+let g = map(s, $p)
+
+in 
+  [ St_B_4(B, A, idB, k, s, $p, gx, y, kab) ]
+
+  --[Finish(B, A, 'R', gx, g^y, kab),
+
+      Secret(A, B, kab) ]->
+
+  [ St_B_5(B, A, idB, k, s, $p, gx, y, kab) , Out(mac(gx,kab) ) ]
+
+
+// Bob recvs MAC(<'R', x>, kab) from Bob and verifies it 
+// Tag the message with role of agent B
+rule A_4_recv: 
+
+let g = map(s, $p)
+
+in
+  [ St_A_4(A, B, idA, k, x, s, $p, gy, kab), In(mac(g^x,kab)) ]
+
+  --[ Commit(A, B, <'I','R',g^x, gy, kab>), 
+
+      Secret(A, B, kab), 
+    
+      Finish(A, B, 'I', g^x, gy, kab) ]->
+
+  [ St_A_5(A, B, idA, k, x, s, $p, gy, kab) ]
+
+
+/*----------------------------------------*/
+
+/* verified by tamarin*/
+lemma executable: 
+exists-trace
+  " Ex A B gx gy kab #i #j.
+      Finish(B, A, 'R', gx, gy, kab) @i 
+        & Finish(A, B, 'I', gx, gy, kab) @j 
+          & not (Ex R A B id1 id2 #i #j. Init(R, A, id1)@i & Init(R, B, id2)@j & not (#i = #j))
+            & not(Ex X #k. Reveal(X)@k)
+    "
+
+/* not verified by tamarin*/ 
+lemma injectiveagreementINITIATOR:
+  " All A B t #i.
+      Commit(A,B,<'I','R',t>)@i &
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
+      ==> (Ex #j. Running(B,A,<'I','R',t>)@j
+        & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>)@i2
+          & not (#i2 = #i)))
+          "
+
+/* vnot erified by tamarin*/
+lemma injectiveagreementRESPONDER:
+  " All A B t #i.
+      Commit(A,B,<'R','I',t>)@i &
+        not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
+      ==> (Ex #j. Running(B,A,<'R','I',t>)@j
+        & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>)@i2
+          & not (#i2 = #i)))
+          "
+
+/* not verified by tamarin*/
+lemma secrecy:
+  "All A B x #i.
+    Secret(A,B,x)@i &
+    not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
+    ==> not (Ex #j. K(x)@j)"
+
+/* not verified by tamarin*/ 
+lemma secrecy_PFS:
+  "All A B x #i.
+    Secret(A,B,x)@i &
+    not ((Ex #r. Reveal(A)@r & r < i) |
+         (Ex #r. Reveal(B)@r & r < i))
+    ==> not (Ex #j. K(x)@j)"
+
+end
