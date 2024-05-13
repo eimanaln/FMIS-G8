@@ -35,7 +35,7 @@ rule Init_A:
 
 
 rule Init_B:
-  [ Fr(~idB), !Ltk(B, kb), !Pk(A, pka), ]
+  [ Fr(~idB), !Ltk(B, kb), !Pk(A, pka) ]
 
   --[ Init('R', B, ~idB)]->
 
@@ -90,21 +90,21 @@ rule A_3_send:
 let km = h(gy^x)
     gx  = 'g'^x
 in 
-  [ St_A_3(A, B, idA, ka, pkb, x, gy, km), In(gy) ]
+  [ St_A_3(A, B, idA, ka, pkb, x, gy, km) ]
   -->
   [ St_A_4(A, B, idA, ka, pkb, x, gy, km), 
-  Out(< gy, gx, sign(<gy, gx>, ka), mac(<'0', A>, km), pk(ka)>) ]
+  Out(< A, sign(<B, gy, gx>, ka), mac(<'0', A>, km), pk(ka)>) ]
 
 
 rule B_3_recv:
   let km = h(gx^y)
   in
-  [ St_B_3(A, B, idB, pka, kb, gx, y, km), In(< gy, gx, signa, mac(<'0', A>, km), pka>)]
+  [ St_B_3(A, B, idB, pka, kb, gx, y, km), In(< A, signa, mac(<'0', A>, km), pka>)]
 
-  --[ Eq(verify(signa, <'g'^y, gx>, pka), true),
+  --[ Eq(verify(signa, <B, 'g'^y, gx>, pka), true),
       Commit(B, A, <'R', 'I', km>), 
       Secret(A, B, km), 
-      Finish(B, A, 'R', gx, gy, km) ]->
+      Finish(B, A, 'R', gx, 'g'^y, km) ]->
 
   [ St_B_4(A, B, idB, pka, kb, gx, y, km) ]
 
@@ -119,18 +119,18 @@ rule B_4_recv:
   -->
 
   [ St_B_5(A, B, idB, pka, kb, gx, y, km), 
-  Out(< gx, gy, sign(<gx, gy>, kb), mac(<'1', B>, km), pk(kb)>) ]
+  Out(< B, sign(<gx, gy>, kb), mac(<'1', B>, km), pk(kb)>) ]
 
 
 rule A_4_recv:
 let km = h(gy^x)
 in 
-  [ St_A_4(A, B, idA, ka, pkb, x, gy, km), In(< gx, gy, signb, mac(<'1', B>, km), pkb>)  ]
+  [ St_A_4(A, B, idA, ka, pkb, x, gy, km), In(< B, signb, mac(<'1', B>, km), pkb>)  ]
 
   --[ Eq(verify(signb, <'g'^x, gy>, pkb), true),
       Commit(A, B, <'I', 'R', km>), 
       Secret(A, B, km), 
-      Finish(A, B, 'I', gx, gy, km)
+      Finish(A, B, 'I', 'g'^x, gy, km)
 
   ]->
   [ St_A_5(A, B, idA, ka, pkb, x, gy, km) ]
