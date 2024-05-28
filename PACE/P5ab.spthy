@@ -5,7 +5,7 @@ builtins:
   hashing, symmetric-encryption, diffie-hellman
 
 functions:
-  mac/2, verify/3, true/0, map/2
+  mac/2, verify/3, true/0, kdf/3, map/2
 equations:
   verify(k, m, mac(m, k)) = true
 
@@ -66,7 +66,7 @@ in
    [ St_A_2(A, B, idA, k, ~x, ~s, $p), Out(<'SEND_A', senc(~s, h(k)), g^~x, $p>) ]
 
 // I think it is weird that B has s here, it didn't event decrypt the message 
-rule B_1_recv :
+rule B_1_recv[derivchecks]:
 let gx = map(s, $p)^x // match to avoid DH_neutral
 in 
   [ St_B_1(B, A, idB, k), In(<'SEND_A', senc(s, h(k)), gx, $p>) ]
@@ -88,7 +88,7 @@ in
   [ St_B_3(B, A, idB, k, s, $p, gx, ~y, kab), Out(<'SEND_B', g^~y>) ]
 
 // Alice recvs nonce y from Bob
-rule A_2_recv:
+rule A_2_recv[derivchecks]:
 
 let g = map(s, $p)
     gy = g^y // match to avoid DH_neutral
@@ -170,7 +170,7 @@ exists-trace
             & not(Ex X #k. Reveal(X)@k)
     "
 
-/* verified by tamarin*/ 
+/* not verified by tamarin*/ 
 lemma injectiveagreementINITIATOR:
   " All A B t #i.
       Commit(A,B,<'I','R',t>)@i &
@@ -180,7 +180,7 @@ lemma injectiveagreementINITIATOR:
           & not (#i2 = #i)))
           "
 
-/* verified by tamarin*/
+/* vnot erified by tamarin*/
 lemma injectiveagreementRESPONDER:
   " All A B t #i.
       Commit(A,B,<'R','I',t>)@i &
@@ -190,14 +190,14 @@ lemma injectiveagreementRESPONDER:
           & not (#i2 = #i)))
           "
 
-/* verified by tamarin*/
+/* not verified by tamarin*/
 lemma secrecy:
   "All A B x #i.
     Secret(A,B,x)@i &
     not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
     ==> not (Ex #j. K(x)@j)"
 
-/* verified by tamarin*/ 
+/* not verified by tamarin*/ 
 lemma secrecy_PFS:
   "All A B x #i.
     Secret(A,B,x)@i &
