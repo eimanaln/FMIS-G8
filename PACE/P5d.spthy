@@ -97,7 +97,7 @@ let g = map(s, $p)
 in 
   [ St_A_2(A, B, idA, k, x, s, $p), In(<'SEND_B', gy>) ]
 
-  --[ Running(A, B, <'R','I', g^x, gy, kab>) ]->
+  --[ Running(A, B, <'R','I', g^x, gy, kab>), _restrict(not (gy = g^x)) ]->
 
   [ St_A_3(A, B, idA, k, x, s, $p, gy, kab) ]
 
