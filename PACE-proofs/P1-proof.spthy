@@ -1,0 +1,213 @@
+theory P1 begin
+
+// Function signature and definition of the equational theory E
+
+functions: fst/1, mac/2, pair/2, snd/1, true/0, verify/3
+equations:
+    fst(<x.1, x.2>) = x.1,
+    snd(<x.1, x.2>) = x.2,
+    verify(k, m, mac(m, k)) = true
+
+
+
+
+
+rule (modulo E) Setup_LTK:
+   [ Fr( ~k ) ]
+  --[ UnidirectionalKey( $A, $B, ~k ) ]->
+   [ !SharedKey( $A, $B, ~k ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Reveal_key_A:
+   [ !SharedKey( A, B, k ) ] --[ Reveal( A ) ]-> [ Out( k ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Reveal_key_B:
+   [ !SharedKey( A, B, k ) ] --[ Reveal( B ) ]-> [ Out( k ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Init_A:
+   [ Fr( ~idA ), !SharedKey( B, A, kba ) ]
+  --[ Init( 'I', A, ~idA ) ]->
+   [ St_A_1( A, ~idA, kba, B ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Init_B:
+   [ Fr( ~idB ), !SharedKey( B, A, kba ) ]
+  --[ Init( 'R', B, ~idB ) ]->
+   [ St_B_1( B, ~idB, kba, A ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A_1_send:
+   [ Fr( ~x ), St_A_1( A, ~idA, kba, B ) ]
+  -->
+   [ St_A_2( A, ~idA, kba, B, ~x ), Out( <'INITIATOR', ~x> ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) B_1_recv:
+   [ St_B_1( B, ~idB, kba, A ), In( <'INITIATOR', x> ) ]
+  --[ Running( B, A, <'I', 'R', x> ) ]->
+   [ St_B_2( B, ~idB, kba, A, x ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) B_2_send:
+   [ St_B_2( B, ~idB, kba, A, x ) ]
+  -->
+   [
+   St_B_3( B, ~idB, kba, A, x, mac(x, kba) ),
+   Out( <'RESPONDER', mac(x, kba)> )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+restriction Restr_A_2_recv_1:
+  "∀ x #NOW. (Restr_A_2_recv_1( x ) @ #NOW) ⇒ (x = true)"
+  // safety formula
+
+rule (modulo E) A_2_recv:
+   [ St_A_2( A, ~idA, kba, B, x ), In( <'RESPONDER', macx> ) ]
+  --[
+  Finish( ), Commit( A, B, <'I', 'R', x> ),
+  Restr_A_2_recv_1( verify(kba, x, macx) )
+  ]->
+   [ St_A_3( A, ~idA, kba, B, x ) ]
+
+  /*
+  rule (modulo AC) A_2_recv:
+     [ St_A_2( A, ~idA, kba, B, x ), In( <'RESPONDER', macx> ) ]
+    --[ Finish( ), Commit( A, B, <'I', 'R', x> ), Restr_A_2_recv_1( z )
+    ]->
+     [ St_A_3( A, ~idA, kba, B, x ) ]
+    variants (modulo AC)
+    1. kba   = kba.14
+       macx  = macx.15
+       x     = x.16
+       z     = verify(kba.14, x.16, macx.15)
+    
+    2. kba   = kba.14
+       macx  = mac(x.16, kba.14)
+       x     = x.16
+       z     = true
+  */
+
+restriction UnidirectionalKeys:
+  "∀ A B k #i.
+    (((UnidirectionalKey( A, B, k ) @ #i) ∧
+      (UnidirectionalKey( B, A, k ) @ #i)) ∧
+     (¬(A = B))) ⇒
+    (⊥)"
+  // safety formula
+
+lemma executable:
+  exists-trace
+  "∃ #i.
+    ((Finish( ) @ #i) ∧
+     (¬(∃ R A B id1 id2 #i.1 #j.
+         ((Init( R, A, id1 ) @ #i.1) ∧ (Init( R, B, id2 ) @ #j)) ∧
+         (¬(#i.1 = #j))))) ∧
+    (¬(∃ A #i.1. Reveal( A ) @ #i.1))"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ #i.
+  (Finish( ) @ #i)
+ ∧
+  (∀ R A B id1 id2 #i.1 #j.
+    (Init( R, A, id1 ) @ #i.1) ∧ (Init( R, B, id2 ) @ #j)
+   ⇒
+    #i.1 = #j) ∧
+  (∀ A #i.1. (Reveal( A ) @ #i.1) ⇒ ⊥)"
+*/
+simplify
+solve( St_A_2( A, ~idA, kba, B, x ) ▶₀ #i )
+  case A_1_send
+  solve( !KU( mac(~x, ~k) ) @ #vk.2 )
+    case B_2_send
+    solve( !KU( ~x ) @ #vk.5 )
+      case A_1_send
+      SOLVED // trace found
+    qed
+  qed
+qed
+
+lemma injectiveagreementINITIATOR:
+  all-traces
+  "∀ A B t #i.
+    ((Commit( A, B, <'I', 'R', t> ) @ #i) ∧
+     (¬((∃ #r. Reveal( A ) @ #r) ∨ (∃ #r. Reveal( B ) @ #r)))) ⇒
+    (∃ #j.
+      (Running( B, A, <'I', 'R', t> ) @ #j) ∧
+      (¬(∃ a2 b2 #i2.
+          (Commit( a2, b2, <'I', 'R', t> ) @ #i2) ∧ (¬(#i2 = #i)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ A B t #i.
+  (Commit( A, B, <'I', 'R', t> ) @ #i)
+ ∧
+  (∀ #r. (Reveal( A ) @ #r) ⇒ ⊥) ∧
+  (∀ #r. (Reveal( B ) @ #r) ⇒ ⊥) ∧
+  (∀ #j.
+    (Running( B, A, <'I', 'R', t> ) @ #j)
+   ⇒
+    ∃ a2 b2 #i2.
+     (Commit( a2, b2, <'I', 'R', t> ) @ #i2) ∧ ¬(#i2 = #i))"
+*/
+simplify
+solve( St_A_2( A, ~idA, kba, B, t ) ▶₀ #i )
+  case A_1_send
+  solve( !KU( mac(~x, ~k) ) @ #vk.2 )
+    case B_2_send
+    solve( (#i2 < #i)  ∥ (#i < #i2) )
+      case case_1
+      solve( St_A_2( a2, ~idA.1, kba, b2, ~x ) ▶₀ #i2 )
+        case A_1_send
+        by contradiction /* cyclic */
+      qed
+    next
+      case case_2
+      solve( St_A_2( a2, ~idA.1, kba, b2, ~x ) ▶₀ #i2 )
+        case A_1_send
+        by contradiction /* cyclic */
+      qed
+    qed
+  next
+    case c_mac
+    solve( !KU( ~k ) @ #vk.4 )
+      case Reveal_key_A
+      by contradiction /* from formulas */
+    next
+      case Reveal_key_B
+      by contradiction /* from formulas */
+    qed
+  qed
+qed
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* All wellformedness checks were successful. */
+
+/*
+Generated from:
+Tamarin version 1.8.0
+Maude version 2.7.1
+Git revision: UNKNOWN, branch: UNKNOWN
+Compiled at: 2023-09-01 12:12:18.719033 UTC
+*/
+
+end

@@ -57,50 +57,53 @@ rule Init_B:
 
 // Protocol starts here 
 
-
+// Alice sends gx, p and [s]_{h(k)} to Bob
 rule A_1_send:
 let g = map(~s, $p)
 in
   [ St_A_1(A, B, idA, k), Fr(~x), Fr(~s) ]
    -->
-   [ St_A_2(A, B, idA, k, ~x, ~s, $p), Out(<senc(~s, h(k)), g^~x, $p>) ]
+   [ St_A_2(A, B, idA, k, ~x, ~s, $p), Out(<'SEND_A', senc(~s, h(k)), g^~x, $p>) ]
 
-
-rule B_1_recv:
-let g = map(s, $p) 
+// I think it is weird that B has s here, it didn't event decrypt the message 
+rule B_1_recv :
+let gx = map(s, $p)^x // match to avoid DH_neutral
 in 
-  [ St_B_1(B, A, idB, k), In(<senc(s, h(k)), gx, $p>) ]
+  [ St_B_1(B, A, idB, k), In(<'SEND_A', senc(s, h(k)), gx, $p>) ]
   -->
   [ St_B_2(B, A, idB, k, s, $p, gx) ]
 
-
+// Bob sends nonce gy to Alice
 rule B_2_send:
 
 let g = map(s, $p)
     kab = h(gx^~y)
+
 in 
 
   [ St_B_2(B, A, idB, k, s, $p, gx), Fr(~y) ]
 
   --[ Running(B, A,<'I','R', gx, g^~y, kab>) ]->
 
-  [ St_B_3(B, A, idB, k, s, $p, gx, ~y, kab), Out(g^~y) ]
+  [ St_B_3(B, A, idB, k, s, $p, gx, ~y, kab), Out(<'SEND_B', g^~y>) ]
 
-
+// Alice recvs nonce y from Bob
 rule A_2_recv:
 
 let g = map(s, $p)
+    gy = g^y // match to avoid DH_neutral
     kab = h(gy^x)
 
 in 
-  [ St_A_2(A, B, idA, k, x, s, $p), In(gy) ]
+  [ St_A_2(A, B, idA, k, x, s, $p), In(<'SEND_B', gy>) ]
 
   --[ Running(A, B, <'R','I', g^x, gy, kab>) ]->
 
   [ St_A_3(A, B, idA, k, x, s, $p, gy, kab) ]
 
 
-
+// Alice returns MAC(<'I', gy>, kab) to Bob
+// Tag the message with the role of agent A
 rule A_3_send:
 
 let g = map(s, $p)
@@ -108,21 +111,25 @@ let g = map(s, $p)
 in 
   [ St_A_3(A, B, idA, k, x, s, $p, gy, kab)]
   -->
-  [ St_A_4(A, B, idA, k, x, s, $p, gy, kab), Out(mac(gy ,kab))]
+  [ St_A_4(A, B, idA, k, x, s, $p, gy, kab), Out( mac(gy,kab) )]
 
-
+// Bob recvs MAC(y, kab) from Alice and verifies it 
 rule B_3_recv:
+
 let g = map(s, $p)
+
 in 
-  [ St_B_3(B, A, idB, k, s, $p, gx, y, kab), In(mac(g^y ,kab)) ]
+  [ St_B_3(B, A, idB, k, s, $p, gx, y, kab), In( mac(g^y,kab) ) ]
 
   --[ Commit(B, A, <'R', 'I', gx, g^y, kab>) ]->
 
   [ St_B_4(B, A, idB, k, s, $p, gx, y, kab) ]
 
-
+// Bob sends MAC(x, kab) to Alice
 rule B_4_send:
+
 let g = map(s, $p)
+
 in 
   [ St_B_4(B, A, idB, k, s, $p, gx, y, kab) ]
 
@@ -130,15 +137,17 @@ in
 
       Secret(A, B, kab) ]->
 
-  [ St_B_5(B, A, idB, k, s, $p, gx, y, kab) , Out(mac(gx,kab)) ]
+  [ St_B_5(B, A, idB, k, s, $p, gx, y, kab) , Out( mac( gx,kab) ) ]
 
 
-
+// Bob recvs MAC(<'R', x>, kab) from Bob and verifies it 
+// Tag the message with role of agent B
 rule A_4_recv: 
+
 let g = map(s, $p)
 
 in
-  [ St_A_4(A, B, idA, k, x, s, $p, gy, kab), In(mac(g^x,kab)) ]
+  [ St_A_4(A, B, idA, k, x, s, $p, gy, kab), In(mac(g^x,kab) ]
 
   --[ Commit(A, B, <'I','R',g^x, gy, kab>), 
 
