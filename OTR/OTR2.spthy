@@ -12,12 +12,8 @@ rule Generate_key_pair:
 
 
 // Reveal Rules 
-rule Reveal_secret_key_A:
+rule Reveal_secret_key:
   [ !Ltk(A, ka) ]--[ Reveal(A)]->[ Out(ka) ]
-
-
-rule Reveal_secret_key_B:
-  [ !Ltk(B, kb)]--[Reveal(B) ]->[ Out(kb) ]
 
 /*----------------------------------------*/
 
