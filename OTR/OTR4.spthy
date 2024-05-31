@@ -1,3 +1,4 @@
+
 theory OTR4
 begin
 
@@ -10,22 +11,26 @@ equations:
   verify(k, m, mac(m, k)) = true
 
 rule Generate_key_pair:
-  [ Fr(~sk) ] --> [ !Ltk($A, ~sk), !Pk($A, pk(~sk)), Out(pk(~sk)) ]
+  [ Fr(~sk) ] --[Gen()]-> [ !Ltk($A, ~sk), !Pk($A, pk(~sk)), Out(pk(~sk)) ]
 
-/* rule Reveal_secret_key:
-  [ !Ltk(A, sk) ] --[ Reveal(A) ]-> [ Out(sk) ] */ 
-
-
-// Reveal Rules 
 rule Reveal_secret_key:
-  [ !Ltk(A, ka) ]--[ Reveal(A)]->[ Out(ka) ]
+  [ !Ltk(A, sk) ] --[ Reveal(A) ]-> [ Out(sk) ]
+
+
+// Reveal Rules
+// rule Reveal_secret_key_A:
+//   [ !Ltk(A, ka) ]--[ Reveal(A)]->[ Out(ka) ]
+
+
+// rule Reveal_secret_key_B:
+//   [ !Ltk(B, kb)]--[Reveal(B) ]->[ Out(kb) ]
 
 /*----------------------------------------*/
 
 rule Init_A:
   [ Fr(~idA), !Ltk(A, ka), !Pk(B, pkb) ]
 
-  --[ Init('I', A, ~idA)]->
+  --[ Init('I', A, ~idA), InitI()]->
 
   [ St_A_1(A, B, ~idA, ka, pkb) ]
 
@@ -33,7 +38,7 @@ rule Init_A:
 rule Init_B:
   [ Fr(~idB), !Ltk(B, kb), !Pk(A, pka) ]
 
-  --[ Init('R', B, ~idB)]->
+  --[ Init('R', B, ~idB), InitR()]->
 
   [ St_B_1(A, B, ~idB, pka, kb) ]
 
@@ -51,10 +56,12 @@ rule A_1_send:
   [ St_A_2(A, B, idA, ka, pkb, ~x), Out(gx) ]
 
 
-rule B_1_recv:
+rule B_1_recv [derivchecks]:
+  let gx = 'g'^x
+  in
   [ St_B_1(A, B, idB, pka, kb), In(gx) ]
 
-  -->
+  --[ Neq(gx, 'g') ]->
 
   [ St_B_2(A, B, idB, pka, kb, gx) ]
 
@@ -65,19 +72,21 @@ rule B_2_send:
   in
   [ St_B_2(A, B, idB, pka, kb, gx), Fr(~y) ]
 
-  --[ Running(B, A, <'I','R', gx, gy>), 
+  --[ Running(B, A, <'I','R', km>),
       Finish(B, A, 'R', gx, gy, km),
-      Secret(A, B, km) ]->
+      ]->
 
   [ St_B_3(A, B, idB, pka, kb, gx, ~y, km), Out(gy) ]
 
 
-rule A_2_recv:
-let km = h(gy^x)
-in 
+rule A_2_recv [derivchecks]:
+let gy = 'g'^y
+    km = h(gy^x)
+in
   [ St_A_2(A, B, idA, ka, pkb, x), In(gy) ]
 
-  --[ Running(A, B, <'R', 'I', km>) ]->
+  --[ Running(A, B, <'R', 'I', km>), Neq(gy, 'g') ]->
+
 
   [ St_A_3(A, B, idA, ka, pkb, x, gy, km) ]
 
@@ -85,11 +94,11 @@ in
 rule A_3_send:
 let km = h(gy^x)
     gx  = 'g'^x
-in 
+in
   [ St_A_3(A, B, idA, ka, pkb, x, gy, km) ]
   -->
-  [ St_A_4(A, B, idA, ka, pkb, x, gy, km), 
-  Out(< A, sign(<B, gy, gx>, ka), mac(<'0', A>, km), pk(ka)>) ]
+  [ St_A_4(A, B, idA, ka, pkb, x, gy, km),
+  Out(< A, sign(<A, B, gy, gx>, ka), mac(<'0', A>, km), pk(ka)>) ]
 
 
 rule B_3_recv:
@@ -97,16 +106,16 @@ rule B_3_recv:
   in
   [ St_B_3(A, B, idB, pka, kb, gx, y, km), In(< A, signa, mac(<'0', A>, km), pka>)]
 
-  --[ Eq(verify(signa, <B, 'g'^y, gx>, pka), true),
-      Commit(B, A, <'R', 'I', km>), 
-      Secret(A, B, km), 
+  --[ Eq(verify(signa, <A, B, 'g'^y, gx>, pka), true),
+      Commit(B, A, <'R', 'I', km>),
+      Secret(A, B, km),
       Finish(B, A, 'R', gx, 'g'^y, km) ]->
 
   [ St_B_4(A, B, idB, pka, kb, gx, y, km) ]
 
 
 
-rule B_4_recv:
+rule B_4_send:
   let km = h(gx^y)
       gy = 'g'^y
   in
@@ -114,18 +123,18 @@ rule B_4_recv:
 
   -->
 
-  [ St_B_5(A, B, idB, pka, kb, gx, y, km), 
-  Out(< B, sign(<gx, gy>, kb), mac(<'1', B>, km), pk(kb)>) ]
+  [ St_B_5(A, B, idB, pka, kb, gx, y, km),
+  Out(< B, sign(<A, B, gx, gy>, kb), mac(<'1', B>, km), pk(kb)>) ]
 
 
 rule A_4_recv:
 let km = h(gy^x)
-in 
+in
   [ St_A_4(A, B, idA, ka, pkb, x, gy, km), In(< B, signb, mac(<'1', B>, km), pkb>)  ]
 
-  --[ Eq(verify(signb, <'g'^x, gy>, pkb), true),
-      Commit(A, B, <'I', 'R', km>), 
-      Secret(A, B, km), 
+  --[ Eq(verify(signb, <A, B, 'g'^x, gy>, pkb), true),
+      Commit(A, B, <'I', 'R', km>),
+      Secret(A, B, km),
       Finish(A, B, 'I', 'g'^x, gy, km)
 
   ]->
@@ -136,12 +145,33 @@ in
 restriction Equality:
   "All x y #i. Eq(x,y) @i ==> x = y"
 
+restriction Inequality:
+  "All x y #i. Neq(x,y) @i ==> not (x = y)"
+
+// restriction TwoI:
+//   "All R A #i #j #k. InitI()@i & InitI()@j & InitI()@k ==> (#i=#j|#i=#k|#j=#k)"
+
+// restriction TwoI:
+//   "All #i #j #k. InitI()@i & InitI()@j & InitI()@k ==> (#i=#j|#i=#k|#j=#k)"
+
+// restriction OneI:
+//   "All #i #j. InitI()@i & InitI()@j ==> (#i=#j)"
+
+// restriction OneR:
+//   "All #i #j. InitR()@i & InitR()@j ==> (#i=#j)"
+
+// restriction Threegenkeys:
+//   "All A #i #j #k. Gen(A)@i & Gen(A)@j & Gen(A)@k ==> (#i=#j|#i=#k|#j=#k)"
+
+restriction Noselftalk:
+  "All A x #i. Commit(A, A, x)@i ==> not (#i=#i)"
+
 /* verified by tamarin */
-lemma executable: 
+lemma executable:
 exists-trace
   " Ex A B gx gy km #i #j.
-      Finish(B, A, 'R', gx, gy, km) @i 
-        & Finish(A, B, 'I', gx, gy, km) @j 
+      Finish(B, A, 'R', gx, gy, km) @i
+        & Finish(A, B, 'I', gx, gy, km) @j
           & not (Ex R A B id1 id2 #i #j. Init(R, A, id1)@i & Init(R, B, id2)@j & not (#i = #j))
             & not (A = B)
                & not(Ex X #k. Reveal(X)@k)
@@ -150,37 +180,63 @@ exists-trace
 
 
 /*verified by tamarin*/
-/* Look at tamarin manual page 17*/  
-lemma injectiveagreementINITIATOR:
-  " All A B t #i.
-      Commit(A,B,<'I','R',t>)@i 
-       & not (Ex R A B id1 id2 #i #j. Init(R, A, id1)@i & Init(R, B, id2)@j & not (#i = #j))
-         & (Ex a2 b2 #j. Running(b2,a2,<'I','R',t> ) @j)
-            & not (A = B) 
-      ==> (Ex #j. Running(B,A,<'I','R',t>)@j
-        & not (Ex a3 b3 #i3. Commit(a3,b3,<'I','R',t>)@i3
-          & not (#i3 = #i))) | ((Ex #r. Reveal(A)@r & (r < i)) | (Ex #r. Reveal(B)@r &(r < i)))
-          "
+/* Look at tamarin manual page 17*/
+// lemma old_injectiveagreementINITIATOR:
+//   " All A B t #i.
+//       Commit(A,B,<'I','R',t>)@i
+//        & not (Ex R A B id1 id2 #i #j. Init(R, A, id1)@i & Init(R, B, id2)@j & not (#i = #j))
+//          & (Ex a2 b2 #j. Running(b2,a2,<'I','R',t> ) @j)
+//             & not (A = B)
+//       ==> (Ex #j. Running(B,A,<'I','R',t>)@j
+//         & not (Ex a3 b3 #i3. Commit(a3,b3,<'I','R',t>)@i3
+//           & not (#i3 = #i))) | ((Ex #r. Reveal(A)@r & (r < i)) | (Ex #r. Reveal(B)@r &(r < i)))
+//           "
 
-/*needs simplification*/
+// /*needs simplification*/
+// lemma old_injectiveagreementRESPONDER:
+//   " All A B t #i.
+//       Commit(A,B,<'R','I',t>)@i
+//       & not (Ex R A B id1 id2 #i #j. Init(R, A, id1)@i & Init(R, B, id2)@j & not (#i = #j))
+//          & (Ex a2 b2 #j. Running(b2,a2,<'R','I',t> ) @j)
+//             & not (A = B)
+//       ==> (Ex #j. Running(B,A,<'R','I',t>)@j
+//         & not (Ex a3 b3 #i3. Commit(a3,b3,<'R','I',t>)@i3
+//           & not (#i3 = #i))) | ((Ex #r. Reveal(A)@r & (r < i)) | (Ex #r. Reveal(B)@r &(r < i)))
+//   "
+
+lemma noninjectiveagreementINITIATOR:
+"All a b t #i.
+  Commit(a,b,<'I','R',t>)@i &
+  not ((Ex #r. Reveal(a)@r) | (Ex #r. Reveal(b)@r))
+  ==> (Ex #j. Running(b,a,<'I','R',t>)@j)"
+
+lemma injectiveagreementINITIATOR:
+"All a b t #i.
+Commit(a,b,<'I','R',t>)@i &
+not ((Ex #r. Reveal(a)@r) | (Ex #r. Reveal(b)@r))
+==> (Ex #j. Running(b,a,<'I','R',t>)@j
+& not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>)@i2
+& not (#i2 = #i)))"
+
+lemma noninjectiveagreementRESPONDER:
+"All a b t #i.
+Commit(a,b,<'R','I',t>)@i &
+not ((Ex #r. Reveal(a)@r) | (Ex #r. Reveal(b)@r))
+==> (Ex #j. Running(b,a,<'R','I',t>)@j)"
+
 lemma injectiveagreementRESPONDER:
-  " All A B t #i.
-      Commit(A,B,<'R','I',t>)@i 
-      & not (Ex R A B id1 id2 #i #j. Init(R, A, id1)@i & Init(R, B, id2)@j & not (#i = #j))
-         & (Ex a2 b2 #j. Running(b2,a2,<'R','I',t> ) @j)
-            & not (A = B) 
-      ==> (Ex #j. Running(B,A,<'R','I',t>)@j
-        & not (Ex a3 b3 #i3. Commit(a3,b3,<'R','I',t>)@i3
-          & not (#i3 = #i))) | ((Ex #r. Reveal(A)@r & (r < i)) | (Ex #r. Reveal(B)@r &(r < i)))
-  "
-  
-/*
+"All a b t #i.
+Commit(a,b,<'R','I',t>)@i &
+not ((Ex #r. Reveal(a)@r) | (Ex #r. Reveal(b)@r))
+==> (Ex #j. Running(b,a,<'R','I',t>)@j
+& not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>)@i2
+& not (#i2 = #i)))"
+
 lemma secrecy:
   "All A B x #i.
     Secret(A,B,x)@i &
     not ((Ex #r. Reveal(A)@r) | (Ex #r. Reveal(B)@r))
     ==> not (Ex #j. K(x)@j)"
- 
-*/ 
+
 
 end
