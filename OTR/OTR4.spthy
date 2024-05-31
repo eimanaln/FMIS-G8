@@ -98,7 +98,7 @@ in
   [ St_A_3(A, B, idA, ka, pkb, x, gy, km) ]
   -->
   [ St_A_4(A, B, idA, ka, pkb, x, gy, km),
-  Out(< A, sign(<A, B, gy, gx>, ka), mac(<'0', A>, km), pk(ka)>) ]
+  Out(< A, sign(<gy, gx>, ka), mac(<'0', A>, km), pk(ka)>) ]
 
 
 rule B_3_recv:
@@ -106,7 +106,7 @@ rule B_3_recv:
   in
   [ St_B_3(A, B, idB, pka, kb, gx, y, km), In(< A, signa, mac(<'0', A>, km), pka>)]
 
-  --[ Eq(verify(signa, <A, B, 'g'^y, gx>, pka), true),
+  --[ Eq(verify(signa, <'g'^y, gx>, pka), true),
       Commit(B, A, <'R', 'I', km>),
       Secret(A, B, km),
       Finish(B, A, 'R', gx, 'g'^y, km) ]->
@@ -124,7 +124,7 @@ rule B_4_send:
   -->
 
   [ St_B_5(A, B, idB, pka, kb, gx, y, km),
-  Out(< B, sign(<A, B, gx, gy>, kb), mac(<'1', B>, km), pk(kb)>) ]
+  Out(< B, sign(<gx, gy>, kb), mac(<'1', B>, km), pk(kb)>) ]
 
 
 rule A_4_recv:
@@ -132,7 +132,7 @@ let km = h(gy^x)
 in
   [ St_A_4(A, B, idA, ka, pkb, x, gy, km), In(< B, signb, mac(<'1', B>, km), pkb>)  ]
 
-  --[ Eq(verify(signb, <A, B, 'g'^x, gy>, pkb), true),
+  --[ Eq(verify(signb, <'g'^x, gy>, pkb), true),
       Commit(A, B, <'I', 'R', km>),
       Secret(A, B, km),
       Finish(A, B, 'I', 'g'^x, gy, km)
